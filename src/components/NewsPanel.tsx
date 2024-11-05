@@ -1,13 +1,55 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Newspaper, TrendingUp, TrendingDown, Clock, ExternalLink } from 'lucide-react';
 import type { NewsItem } from '../services/types';
+import { api } from '../services/api';
 
 interface NewsPanelProps {
   crypto: string;
   news: NewsItem[];
 }
 
-export const NewsPanel: React.FC<NewsPanelProps> = ({ crypto, news }) => {
+export const NewsPanel: React.FC<NewsPanelProps> = ({ crypto }) => {
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const NEWS_PER_PAGE = 5; // Limit to 5 news items per page
+
+  useEffect(() => {
+    // Reset when crypto changes
+    setNews([]);
+    setPage(1);
+    setHasMore(true);
+    fetchNews(1);
+  }, [crypto]);
+
+  const fetchNews = async (pageNum: number) => {
+    try {
+      setLoading(true);
+      const { news: newNews, hasMore: moreNews } = await api.getNews(crypto, pageNum, NEWS_PER_PAGE);
+      
+      if (pageNum === 1) {
+        setNews(newNews);
+      } else {
+        setNews(prev => [...prev, ...newNews]);
+      }
+      
+      setHasMore(moreNews);
+    } catch (error) {
+      console.error('Error fetching news:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadMore = () => {
+    if (!loading && hasMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      fetchNews(nextPage);
+    }
+  };
+
   const getCryptoSymbol = (cryptoId: string) => {
     const symbols: Record<string, string> = {
       'bitcoin': 'BTC',
@@ -122,71 +164,93 @@ export const NewsPanel: React.FC<NewsPanelProps> = ({ crypto, news }) => {
         Latest {getCryptoSymbol(crypto)} News
       </h2>
       <div className="flex-1 space-y-3 overflow-y-auto max-h-[calc(100vh-24rem)]">
-        {news && news.length > 0 ? (
-          news.map((item, index) => {
-            const sentimentAnalysis = analyzeSentimentContext(
-              item.title + ' ' + (item.description || ''),
-              getCryptoSymbol(crypto)
-            );
-            return (
-              <div key={index} className="bg-slate-750 rounded-lg overflow-hidden">
-                {item.imageUrl && (
-                  <div className="relative h-32 w-full">
-                    <img 
-                      src={item.imageUrl} 
-                      alt={cleanTitle(item.title)}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-750 to-transparent" />
-                  </div>
-                )}
-                <div className="p-3">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-medium text-sm leading-snug flex-1">
-                        {cleanTitle(item.title)}
-                      </h3>
-                      <div className={`flex-shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs whitespace-nowrap ${
-                        getSentimentColor(sentimentAnalysis.sentiment)
-                      }`}>
-                        {getSentimentIcon(sentimentAnalysis.sentiment)}
-                        <span>{sentimentAnalysis.confidence}%</span>
-                      </div>
+        {loading && news.length === 0 ? (
+          <div className="flex justify-center py-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+          </div>
+        ) : news.length > 0 ? (
+          <>
+            {news.map((item, index) => {
+              const sentimentAnalysis = analyzeSentimentContext(
+                item.title + ' ' + (item.description || ''),
+                getCryptoSymbol(crypto)
+              );
+              return (
+                <div key={index} className="bg-slate-750 rounded-lg overflow-hidden">
+                  {item.imageUrl && (
+                    <div className="relative h-32 w-full">
+                      <img 
+                        src={item.imageUrl} 
+                        alt={cleanTitle(item.title)}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-750 to-transparent" />
                     </div>
-                    
-                    {item.description && (
-                      <p className="text-xs text-slate-400 line-clamp-2">
-                        {cleanTitle(item.description)}
-                      </p>
-                    )}
-
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2 text-slate-400">
-                        <Clock className="w-3 h-3" />
-                        <span>{formatTimeAgo(item.timestamp)}</span>
-                        <span>•</span>
-                        <span>{item.source}</span>
+                  )}
+                  <div className="p-3">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-medium text-sm leading-snug flex-1">
+                          {cleanTitle(item.title)}
+                        </h3>
+                        <div className={`flex-shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs whitespace-nowrap ${
+                          getSentimentColor(sentimentAnalysis.sentiment)
+                        }`}>
+                          {getSentimentIcon(sentimentAnalysis.sentiment)}
+                          <span>{sentimentAnalysis.confidence}%</span>
+                        </div>
                       </div>
-                      {item.url && (
-                        <a
-                          href={item.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-blue-400 hover:text-blue-300"
-                        >
-                          Read more
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
+                      
+                      {item.description && (
+                        <p className="text-xs text-slate-400 line-clamp-2">
+                          {cleanTitle(item.description)}
+                        </p>
                       )}
+
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2 text-slate-400">
+                          <Clock className="w-3 h-3" />
+                          <span>{formatTimeAgo(item.timestamp)}</span>
+                          <span>•</span>
+                          <span>{item.source}</span>
+                        </div>
+                        {item.url && (
+                          <a
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-blue-400 hover:text-blue-300"
+                          >
+                            Read more
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            );
-          })
+              );
+            })}
+            {hasMore && (
+              <button
+                onClick={loadMore}
+                disabled={loading}
+                className="w-full py-2 mt-4 text-sm bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500" />
+                    Loading...
+                  </span>
+                ) : (
+                  'Load More News'
+                )}
+              </button>
+            )}
+          </>
         ) : (
           <div className="text-center text-slate-400 py-4">
             <Newspaper className="w-8 h-8 mx-auto mb-2 opacity-50" />

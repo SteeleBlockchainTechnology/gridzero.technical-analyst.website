@@ -261,17 +261,28 @@ class AnalysisService {
   }
 
   private async getMarketSentiment(crypto: string) {
-    const news = await api.getNews(crypto);
-    const positiveCount = news.filter(n => n.sentiment === 'positive').length;
-    const negativeCount = news.filter(n => n.sentiment === 'negative').length;
-    const total = news.length || 1;
+    try {
+      const newsResponse = await api.getNews(crypto);
+      const newsItems = newsResponse.news; // Extract the news array
+      
+      const positiveCount = newsItems.filter(n => n.sentiment === 'positive').length;
+      const negativeCount = newsItems.filter(n => n.sentiment === 'negative').length;
+      const total = newsItems.length || 1;
 
-    return {
-      newsScore: (positiveCount / total) * 100,
-      socialScore: Math.random() * 100, // Placeholder for social score
-      marketMood: positiveCount > negativeCount ? 'Bullish' : 
-                 negativeCount > positiveCount ? 'Bearish' : 'Neutral'
-    };
+      return {
+        newsScore: (positiveCount / total) * 100,
+        socialScore: Math.random() * 100, // Placeholder for social score
+        marketMood: positiveCount > negativeCount ? 'Bullish' : 
+                   negativeCount > positiveCount ? 'Bearish' : 'Neutral'
+      };
+    } catch (error) {
+      console.error('Error getting market sentiment:', error);
+      return {
+        newsScore: 50,
+        socialScore: 50,
+        marketMood: 'Neutral'
+      };
+    }
   }
 
   private calculateStochRSI(prices: number[], period: number = 14): number {
@@ -535,7 +546,8 @@ class AnalysisService {
 
       // Get market sentiment and news
       const sentiment = await this.getMarketSentiment(crypto);
-      const news = await api.getNews(crypto);
+      const newsResponse = await api.getNews(crypto);
+      const newsItems = newsResponse.news; // Extract the news array
 
       // Calculate price targets using historical data and indicators
       const priceTargets = this.calculatePriceTargets(
@@ -564,7 +576,7 @@ class AnalysisService {
       const aiAnalysis = await this.getAIAnalysis(
         crypto,
         technicalIndicators,
-        news,
+        newsItems, // Pass the news array
         sentiment
       );
 
@@ -685,7 +697,7 @@ class AnalysisService {
         sentiment: {
           overall: sentiment.marketMood,
           newsScore: sentiment.newsScore.toFixed(2),
-          recentNews: news.slice(0, 3).map(n => ({
+          recentNews: newsItems.slice(0, 3).map(n => ({
             title: n.title,
             sentiment: n.sentiment
           }))

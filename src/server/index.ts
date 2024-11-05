@@ -32,13 +32,14 @@ const NEWS_REQUEST_DELAY = 60 * 1000; // 1 minute between requests
 // Add news endpoint with proper error handling and rate limiting
 app.get('/api/news/:crypto', async (req: Request, res: Response) => {
   const { crypto } = req.params;
-  const cacheKey = `news-${crypto}`;
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 5;
+  const cacheKey = `news-${crypto}-${page}`;
 
   try {
     // Check cache first
     const cached = cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < NEWS_CACHE_DURATION) {
-      console.log('Using cached news data for', crypto);
       return res.json(cached.data);
     }
 
@@ -46,7 +47,6 @@ app.get('/api/news/:crypto', async (req: Request, res: Response) => {
     const timeSinceLastRequest = Date.now() - lastNewsRequest;
     if (timeSinceLastRequest < NEWS_REQUEST_DELAY) {
       if (cached) {
-        console.log('Rate limited, using cached news data for', crypto);
         return res.json(cached.data);
       }
       return res.status(429).json({ 
@@ -55,27 +55,22 @@ app.get('/api/news/:crypto', async (req: Request, res: Response) => {
       });
     }
 
-    // Make request to NewsData API
-    const query = encodeURIComponent(
-      `${crypto} AND (price OR trading OR market OR investment) NOT (scam OR hack)`
-    );
-    
     const response = await axios.get(NEWSDATA_API, {
       params: {
         apikey: NEWSDATA_API_KEY,
-        q: query,
-        language: 'en'
-      },
-      timeout: 10000
+        q: `${crypto} AND (price OR trading OR market OR investment) NOT (scam OR hack)`,
+        language: 'en',
+        page: page,
+        size: limit
+      }
     });
 
     if (!response.data || response.data.status !== "success") {
       throw new Error('Invalid response from NewsData API');
     }
 
-    // Process and cache the news data
     const processedNews = response.data.results
-      .slice(0, 5)
+      .slice(0, limit)
       .map((item: any) => ({
         title: item.title,
         source: item.source_name,
@@ -86,26 +81,26 @@ app.get('/api/news/:crypto', async (req: Request, res: Response) => {
         imageUrl: item.image_url
       }));
 
-    // Update cache and rate limit timestamp
     cache.set(cacheKey, {
-      data: processedNews,
+      data: {
+        articles: processedNews,
+        page,
+        totalResults: response.data.totalResults
+      },
       timestamp: Date.now()
     });
-    lastNewsRequest = Date.now();
 
-    return res.json(processedNews);
+    lastNewsRequest = Date.now();
+    return res.json({ articles: processedNews });
   } catch (error: any) {
     console.error('News API error:', error.response?.data || error.message);
     
-    // Try to use cached data if available
     const cached = cache.get(cacheKey);
     if (cached) {
-      console.log('Error occurred, using cached news data for', crypto);
       return res.json(cached.data);
     }
     
-    // Return empty array with error status if no cache available
-    return res.status(500).json([]);
+    return res.status(500).json({ articles: [] });
   }
 });
 
