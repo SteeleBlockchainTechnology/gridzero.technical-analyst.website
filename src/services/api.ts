@@ -20,41 +20,66 @@ interface NewsCacheEntry extends CacheEntry {
   page: number;
 }
 
-// Cache implementation with longer duration
-const cache = new Map<string, CacheEntry | NewsCacheEntry>();
+// Enhanced cache configuration
 const CACHE_DURATION = {
   PRICE: 1 * 60 * 1000,        // 1 minute
   NEWS: 3 * 60 * 60 * 1000,    // 3 hours
   HISTORICAL: 5 * 60 * 1000,   // 5 minutes
+  SENTIMENT: 30 * 60 * 1000,   // 30 minutes
 };
 
-// Rate limiting configuration
+// Rate limiting configuration per endpoint
 const rateLimiter = {
   newsdata: {
     lastCall: 0,
     minInterval: 60000, // 1 minute between calls
     retryCount: 0,
     maxRetries: 3,
-    backoffMultiplier: 2 // For exponential backoff
+    backoffMultiplier: 2, // For exponential backoff
+    perCryptoCache: new Map<string, any>()
   }
 };
 
+// Enhanced cache implementation with crypto-specific caching
+const cache = new Map<string, CacheEntry | NewsCacheEntry>();
+
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-const isValidCache = (key: string, type: 'PRICE' | 'NEWS' | 'HISTORICAL') => {
+const isValidCache = (key: string, type: keyof typeof CACHE_DURATION) => {
   const cached = cache.get(key);
-  return cached && Date.now() - cached.timestamp < CACHE_DURATION[type];
+  if (!cached) return false;
+  
+  const isValid = Date.now() - cached.timestamp < CACHE_DURATION[type];
+  console.log(`Cache ${key} is ${isValid ? 'valid' : 'expired'}`);
+  return isValid;
 };
 
-// Enhanced rate limit handler
-const handleRateLimit = async (api: 'newsdata') => {
+// Enhanced rate limit handler with better caching
+const handleRateLimit = async (api: 'newsdata', crypto: string) => {
   const limiter = rateLimiter[api];
   const now = Date.now();
   const timeSinceLastCall = now - limiter.lastCall;
   
+  // Check if we have cached data for this crypto
+  const cachedData = limiter.perCryptoCache.get(crypto);
+  if (cachedData) {
+    console.log(`Using cached data for ${crypto} during rate limit`);
+    return cachedData;
+  }
+  
   if (timeSinceLastCall < limiter.minInterval) {
     const waitTime = limiter.minInterval * Math.pow(limiter.backoffMultiplier, limiter.retryCount);
-    console.log(`Rate limited, waiting ${waitTime/1000} seconds before retry...`);
+    console.log(`Rate limited for ${crypto}, using cache or waiting ${waitTime/1000} seconds...`);
+    
+    // Try to use cache first
+    const cacheKey = `news-${crypto}`;
+    const cachedNews = cache.get(cacheKey);
+    if (cachedNews) {
+      console.log(`Found cached news for ${crypto}`);
+      return cachedNews;
+    }
+    
+    // If no cache, wait and retry
     await wait(waitTime);
     limiter.retryCount++;
   } else {
@@ -62,6 +87,7 @@ const handleRateLimit = async (api: 'newsdata') => {
   }
   
   limiter.lastCall = Date.now();
+  return null;
 };
 
 export const api = {
@@ -190,38 +216,36 @@ export const api = {
     
     // Check cache first
     if (isValidCache(cacheKey, 'NEWS')) {
+      console.log(`Using cached news for ${crypto}`);
       const cachedNews = cache.get(cacheKey) as NewsCacheEntry;
       if (cachedNews.data.length >= limit) {
-        console.log('Using cached news data');
         return { news: cachedNews.data };
       }
     }
 
     try {
-      await handleRateLimit('newsdata');
+      // Handle rate limiting with caching
+      const rateLimitResult = await handleRateLimit('newsdata', crypto);
+      if (rateLimitResult) {
+        return rateLimitResult;
+      }
       
-      // Convert crypto name to ticker symbol and create search terms
-      const ticker = crypto.toUpperCase() === 'BITCOIN' ? 'BTC' : crypto.toUpperCase();
-      const searchTerms = `${crypto} or ${crypto.toLowerCase()} or ${ticker}`;
-      
-      // Make direct request to NewsData API with updated query parameters
+      // Make API call if no cache hit
       const response = await axios.get('https://newsdata.io/api/1/news', {
         params: {
           apikey: 'pub_5827833f271352bd4b9540e47433b0fc33dc5',
-          q: searchTerms,
+          q: `${crypto} OR ${crypto.toLowerCase()} OR ${crypto.toUpperCase()}`,
           language: 'en',
           category: 'business,science,technology,world',
-          size: limit
+          size: limit * 2
         },
-        timeout: 10000 // 10 second timeout
+        timeout: 10000
       });
 
       if (!response.data?.results) {
-        console.log('No news data from API, using fallback');
-        return { news: this.getFallbackNews(crypto) };
+        throw new Error('Invalid news data format');
       }
 
-      // Process and filter news
       const processedNews = response.data.results
         .filter((item: any) => 
           item.title && 
@@ -243,29 +267,27 @@ export const api = {
         .slice(0, limit);
 
       // Cache the processed news
-      cache.set(cacheKey, {
+      const cacheEntry = {
         data: processedNews,
         timestamp: Date.now(),
         hasMore: response.data.results.length > processedNews.length,
         page: 1
-      });
+      };
+      
+      cache.set(cacheKey, cacheEntry);
+      rateLimiter.newsdata.perCryptoCache.set(crypto, { news: processedNews });
 
       return { news: processedNews };
     } catch (error: any) {
       console.error('Error fetching news:', error);
       
-      // Handle rate limiting specifically
-      if (error.response?.status === 429) {
-        console.log('Rate limited, checking cache...');
-        const cachedNews = cache.get(cacheKey) as NewsCacheEntry;
-        if (cachedNews) {
-          console.log('Using cached news data after rate limit');
-          return { news: cachedNews.data };
-        }
+      // Try to use cached data on error
+      const cachedNews = cache.get(cacheKey) as NewsCacheEntry;
+      if (cachedNews) {
+        console.log(`Using cached news for ${crypto} after error`);
+        return { news: cachedNews.data };
       }
       
-      // Return fallback news if no cache available
-      console.log('Using fallback news data');
       return { news: this.getFallbackNews(crypto) };
     }
   },

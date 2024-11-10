@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Brain, TrendingUp, TrendingDown, Activity, Target, AlertTriangle, Clock } from 'lucide-react';
+import { Brain, TrendingUp, TrendingDown, Activity, Target, AlertTriangle, Clock, BarChart, LineChart, PieChart } from 'lucide-react';
 import { analysisService } from '../services/analysis';
+import { motion } from 'framer-motion';
 
 interface MarketAnalysisProps {
   crypto: string;
@@ -203,9 +204,122 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto }) => {
   }, [crypto]);
 
   if (loading) {
+    const loadingSteps = [
+      { 
+        icon: LineChart, 
+        text: "Collecting market data and price history...",
+        color: "text-blue-400"
+      },
+      { 
+        icon: Brain, 
+        text: "Analyzing technical indicators and patterns...",
+        color: "text-purple-400"
+      },
+      { 
+        icon: BarChart, 
+        text: "Processing market sentiment and volume data...",
+        color: "text-green-400"
+      },
+      { 
+        icon: PieChart, 
+        text: "Calculating risk metrics and support/resistance...",
+        color: "text-yellow-400"
+      },
+      { 
+        icon: Activity, 
+        text: "Generating price predictions and strategies...",
+        color: "text-red-400"
+      }
+    ];
+
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+      <div className="flex flex-col items-center justify-center min-h-[400px] relative">
+        {/* Background animation */}
+        <motion.div
+          className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-blue-500/5 rounded-lg"
+          animate={{
+            backgroundPosition: ['0% 0%', '100% 100%'],
+            scale: [1, 1.02, 1],
+          }}
+          transition={{
+            duration: 3,
+            repeat: Infinity,
+            repeatType: "reverse",
+          }}
+        />
+
+        {/* Loading steps container */}
+        <div className="relative z-10 space-y-4 w-full max-w-2xl p-6">
+          {loadingSteps.map((step, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, x: -50 }}
+              animate={{ 
+                opacity: 1, 
+                x: 0,
+                transition: {
+                  delay: index * 0.5 // Sequential appearance
+                }
+              }}
+              className="flex items-center gap-4 bg-slate-800/50 p-4 rounded-lg backdrop-blur-sm border border-slate-700/50"
+            >
+              {/* Icon animation */}
+              <motion.div
+                animate={{
+                  rotate: 360,
+                  scale: [1, 1.2, 1],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "linear",
+                  delay: index * 0.5
+                }}
+                className={`shrink-0 ${step.color}`}
+              >
+                <step.icon className="w-6 h-6" />
+              </motion.div>
+
+              {/* Text animation */}
+              <motion.span
+                className="text-sm font-medium text-gray-200"
+                animate={{
+                  opacity: [0.5, 1, 0.5],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  repeatType: "reverse",
+                  delay: index * 0.5
+                }}
+              >
+                {step.text}
+              </motion.span>
+
+              {/* Progress indicator */}
+              <motion.div
+                className={`ml-auto h-1.5 rounded-full ${step.color}`}
+                initial={{ width: 0 }}
+                animate={{ width: "100%" }}
+                transition={{
+                  duration: 2,
+                  delay: index * 0.5,
+                  ease: "easeInOut"
+                }}
+              />
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Additional loading info */}
+        <motion.div
+          className="absolute bottom-4 text-sm text-gray-400 text-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 2.5 }}
+        >
+          Analyzing multiple data sources for accurate predictions...
+        </motion.div>
       </div>
     );
   }
