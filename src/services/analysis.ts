@@ -6,11 +6,13 @@ const genAI = new GoogleGenerativeAI("AIzaSyA4cz4YSwsIJmtlh4ml1MNoNeLu43oQqFw");
 
 interface TechnicalIndicators {
   currentPrice: number;
+  price_change_24h: number;
   rsi: number;
   macd: {
     value: number;
     signal: number;
     histogram: number;
+    interpretation: string;
   };
   ma20: number;
   ma50: number;
@@ -24,59 +26,11 @@ interface TechnicalIndicators {
 
 interface DetailedAnalysis {
   summary: string;
-  technicalAnalysis: {
-    rsi: { value: number; interpretation: string };
-    macd: {
-      value: number;
-      signal: number;
-      histogram: number;
-      interpretation: string;
-    };
-    movingAverages: {
-      ma20: number;
-      ma50: number;
-      ma200: number;
-      interpretation: string;
-    };
-    volume: {
-      current: number;
-      change: number;
-      interpretation: string;
-    };
-    volatility: number;
-  };
-  sentimentAnalysis: {
-    overall: string;
-    newsScore: number;
-    socialScore: number;
-    marketMood: string;
-  };
-  aiPrediction: {
-    shortTerm: string;
-    midTerm: string;
-    longTerm: string;
-    confidence: number;
-    reasoning: string[];
-  };
-  marketStructure: {
-    trend: string;
-    support: number;
-    resistance: number;
-    breakoutPotential: string;
-  };
+  aiAnalysis: string;
   priceTargets: {
-    '24H': {
-      range: string;
-      confidence: string;
-    };
-    '7D': {
-      range: string;
-      confidence: string;
-    };
-    '30D': {
-      range: string;
-      confidence: string;
-    };
+    '24H': { range: string; confidence: string };
+    '7D': { range: string; confidence: string };
+    '30D': { range: string; confidence: string };
   };
   signals: Array<{
     text: string;
@@ -88,20 +42,8 @@ interface DetailedAnalysis {
     stop: string;
     target: string;
   };
-  marketConditions: {
+  marketStructure: {
     trend: string;
-    support: string;
-    resistance: string;
-    distanceToResistance: string;
-    distanceToSupport: string;
-  };
-  sentiment: {
-    overall: string;
-    newsScore: string;
-    recentNews: Array<{
-      title: string;
-      sentiment: string;
-    }>;
   };
 }
 
@@ -383,55 +325,84 @@ class AnalysisService {
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
     const prompt = `
-      Analyze ${crypto} market data and provide a structured analysis in HTML format:
+      Act as an expert quantitative analyst and cryptocurrency trader. Analyze the following comprehensive market data for ${crypto} and provide a detailed strategic analysis:
 
-      TECHNICAL METRICS:
-      • Price: ${technicalIndicators.currentPrice} USD
-      • RSI(14): ${technicalIndicators.rsi}
-      • MACD: ${JSON.stringify(technicalIndicators.macd)}
-      • Moving Averages: MA20=${technicalIndicators.ma20}, MA50=${technicalIndicators.ma50}, MA200=${technicalIndicators.ma200}
+      PRICE ACTION & TECHNICAL ANALYSIS:
+      • Current Price: ${technicalIndicators.currentPrice} USD
+      • 24h Change: ${technicalIndicators.price_change_24h}%
+      • Key Moving Averages:
+        - MA20: ${technicalIndicators.ma20}
+        - MA50: ${technicalIndicators.ma50}
+        - MA200: ${technicalIndicators.ma200}
+      
+      MOMENTUM INDICATORS:
+      • RSI(14): ${technicalIndicators.rsi} - ${this.interpretRSI(technicalIndicators.rsi)}
+      • MACD: 
+        - Value: ${technicalIndicators.macd.value}
+        - Signal: ${technicalIndicators.macd.signal}
+        - Histogram: ${technicalIndicators.macd.histogram}
       • Volume Change: ${technicalIndicators.volumeChange}%
-
-      MARKET CONTEXT:
-      • Current Phase: ${technicalIndicators.marketPhase}
+      
+      MARKET STRUCTURE:
+      • Current Market Phase: ${technicalIndicators.marketPhase}
       • Volatility: ${technicalIndicators.volatility}%
-       Support: ${technicalIndicators.support}
-      • Resistance: ${technicalIndicators.resistance}
-
-      SENTIMENT:
-      • News Sentiment: ${sentiment.newsScore}% positive
-       Market Mood: ${sentiment.marketMood}
-      • News: ${JSON.stringify(news)}
-
-      Format your response in this exact HTML structure and make sure they are higly concise and accurate. Use all the information above and be very analytical and act like a professional trader. Once You have information precisely format them in the following struture precisely following what each section is asking. Do not make up any information use the information to make a very accurate information:
+      • Key Price Levels:
+        - Support: ${technicalIndicators.support}
+        - Resistance: ${technicalIndicators.resistance}
+      
+      MARKET SENTIMENT:
+      • News Sentiment Score: ${sentiment.newsScore}%
+      • Market Mood: ${sentiment.marketMood}
+      • Recent News Headlines:
+      ${news.slice(0, 3).map(n => `  - ${n.title} (${n.sentiment})`).join('\n')}
+      
+      Based on this comprehensive data, provide a detailed analysis in the following HTML structure. Be extremely analytical and precise, focusing on actionable insights:
 
       <div class="analysis">
         <div class="summary">
-          <h3>Executive Summary</h3>
-          <p class="highlight">[2-line market summary]</p>
+          <h3>Strategic Market Analysis</h3>
+          <p class="highlight">[Provide a concise but detailed 2-3 line summary of the current market situation, incorporating price action, technical indicators, and sentiment. Be specific about the market phase and key levels.]</p>
         </div>
 
         <div class="signals">
-          <h3>Key Signals</h3>
+          <h3>Critical Trading Signals</h3>
           <ul>
-            <li class="signal-item [positive/negative/neutral]">[Signal 1]</li>
-            <li class="signal-item [positive/negative/neutral]">[Signal 2]</li>
-            <li class="signal-item [positive/negative/neutral]">[Signal 3]</li>
+            <li class="signal-item [positive/negative/neutral]">[Technical Signal: Describe specific technical setup or pattern]</li>
+            <li class="signal-item [positive/negative/neutral]">[Momentum Signal: Describe momentum status and implications]</li>
+            <li class="signal-item [positive/negative/neutral]">[Volume Signal: Describe volume analysis and its significance]</li>
+            <li class="signal-item [positive/negative/neutral]">[Sentiment Signal: Describe sentiment impact on price]</li>
           </ul>
         </div>
 
-       
-          <div class="levels">
-            <div class="entry">Entry: $[price]</div>
-            <div class="stop">Stop Loss: $[price]</div>
-            <div class="target">Target: $[price]</div>
+        <div class="strategy">
+          <h3>Strategic Recommendations</h3>
+          <div class="position-strategy">
+            [Provide specific entry, exit, and position management recommendations based on all available data]
+          </div>
+          <div class="risk-management">
+            <div class="entry">Entry Zones: $[Specify optimal entry ranges with reasoning]</div>
+            <div class="stop">Stop Loss: $[Specify stop loss levels with technical justification]</div>
+            <div class="target">Targets: $[Specify multiple price targets with technical justification]</div>
+          </div>
+          <div class="timeframe">
+            [Specify optimal trading timeframe based on volatility and market phase]
           </div>
         </div>
       </div>
 
-      Keep all explanations brief and focused. Use appropriate class names (positive/negative/neutral) based on the nature of each signal.
-      Remove any markdown formatting (**) from the output.
-      Ensure all price levels are properly formatted with $ symbol.
+      Important Guidelines:
+      1. Base all analysis on quantitative data provided
+      2. Highlight specific technical setups and patterns
+      3. Provide concrete price levels for all recommendations
+      4. Include risk management considerations
+      5. Consider market structure and phase in all recommendations
+      6. Integrate sentiment analysis with technical signals
+      7. Be precise with numbers and percentages
+      8. Focus on actionable insights
+      9. Maintain professional, analytical tone
+      10. Use technical terminology appropriately
+
+      Remove any markdown formatting and ensure all price levels are properly formatted with $ symbol.
     `;
 
     const result = await model.generateContent(prompt);
@@ -576,15 +547,41 @@ class AnalysisService {
       // Calculate all technical indicators
       const rsi = this.calculateRSI(prices);
       const macd = this.calculateMACD(prices);
-      const ma20 = this.calculateSMA(prices, 20);
-      const ma50 = this.calculateSMA(prices, 50);
-      const ma200 = this.calculateSMA(prices, 200);
+      
+      // Calculate moving averages
+      const movingAverages = {
+        ma20: this.calculateSMA(prices, 20),
+        ma50: this.calculateSMA(prices, 50),
+        ma200: this.calculateSMA(prices, 200)
+      };
+
       const { support, resistance } = this.findSupportResistance(prices);
       const volumeRatio = this.calculateVolumeRatio(volumes);
       const volatilityIndex = this.calculateVolatility(prices);
       const stochRSI = this.calculateStochRSI(prices);
       const obvTrend = this.calculateOBV(prices, volumes);
-      const marketPhase = this.determineMarketPhase(prices, ma50, ma200);
+      const marketPhase = this.determineMarketPhase(prices, movingAverages.ma50, movingAverages.ma200);
+
+      // Create technical indicators object with calculated MAs
+      const technicalIndicators: TechnicalIndicators = {
+        currentPrice,
+        price_change_24h: historicalData.price_change_24h,
+        rsi,
+        macd: {
+          value: macd.value,
+          signal: macd.signal,
+          histogram: macd.histogram,
+          interpretation: macd.interpretation
+        },
+        ma20: movingAverages.ma20,
+        ma50: movingAverages.ma50,
+        ma200: movingAverages.ma200,
+        volumeChange: volumeRatio,
+        marketPhase,
+        volatility: volatilityIndex,
+        support,
+        resistance
+      };
 
       // Updated market summary with date-based formatting and current trend lines
       const latestDateIndex = prices.length - 1;
@@ -643,20 +640,6 @@ class AnalysisService {
       );
 
       // Generate AI analysis
-      const technicalIndicators = {
-        currentPrice,
-        rsi,
-        macd,
-        ma20,
-        ma50,
-        ma200,
-        volumeChange: volumeRatio,
-        marketPhase,
-        volatility: volatilityIndex,
-        support,
-        resistance
-      };
-
       const aiAnalysis = await this.getAIAnalysis(
         crypto,
         technicalIndicators,
@@ -693,53 +676,7 @@ class AnalysisService {
 
       return {
         summary: parsedAnalysis.summary[0] || marketSummary,
-        technicalAnalysis: {
-          rsi: { value: rsi, interpretation: this.interpretRSI(rsi) },
-          macd: {
-            value: macd.value,
-            signal: macd.signal,
-            histogram: macd.histogram,
-            interpretation: macd.interpretation
-          },
-          movingAverages: {
-            ma20: this.calculateSMA(prices, 20),
-            ma50: this.calculateSMA(prices, 50),
-            ma200: this.calculateSMA(prices, 200),
-            interpretation: marketPhase
-          },
-          volume: {
-            current: volumes[volumes.length - 1] || 0,
-            change: volumeRatio,
-            interpretation: obvTrend
-          },
-          volatility: volatilityIndex
-        },
-        sentimentAnalysis: {
-          overall: sentiment.marketMood,
-          newsScore: parseFloat(sentiment.newsScore.toFixed(2)),
-          socialScore: parseFloat(sentiment.socialScore.toFixed(2)),
-          marketMood: sentiment.marketMood
-        },
-        aiPrediction: {
-          shortTerm: predictions.aiPrediction.shortTerm,
-          midTerm: predictions.aiPrediction.midTerm,
-          longTerm: predictions.aiPrediction.longTerm,
-          confidence: parseFloat((85 - volatilityIndex / 2).toFixed(2)),
-          reasoning: [
-            parsedAnalysis.summary[0] || marketSummary,
-            ...signals.map(s => `${s.indicator}: ${s.signal}`),
-            `Volume trend: ${obvTrend}`,
-            `StochRSI indicates ${this.interpretStochRSI(stochRSI)}`,
-            `Market is in ${marketPhase} phase`
-          ]
-        },
-        marketStructure: {
-          trend: marketPhase,
-          support: parseFloat(support.toFixed(2)),
-          resistance: parseFloat(resistance.toFixed(2)),
-          breakoutPotential: currentPrice > resistance ? 'Bullish Breakout Potential' :
-                            currentPrice < support ? 'Bearish Breakdown Risk' : 'Range Bound'
-        },
+        aiAnalysis,
         priceTargets: {
           '24H': {
             range: `$${priceTargets.shortTerm.low.toFixed(2)} - $${priceTargets.shortTerm.high.toFixed(2)}`,
@@ -764,20 +701,8 @@ class AnalysisService {
           stop: (support * 0.95).toString(),
           target: resistance.toString()
         },
-        marketConditions: {
-          trend: marketPhase,
-          support: support.toFixed(2),
-          resistance: resistance.toFixed(2),
-          distanceToResistance: ((resistance - currentPrice) / currentPrice * 100).toFixed(2),
-          distanceToSupport: ((currentPrice - support) / currentPrice * 100).toFixed(2)
-        },
-        sentiment: {
-          overall: sentiment.marketMood,
-          newsScore: sentiment.newsScore.toString(),
-          recentNews: newsItems.slice(0, 3).map(n => ({
-            title: n.title,
-            sentiment: n.sentiment
-          }))
+        marketStructure: {
+          trend: marketPhase
         }
       };
     } catch (error) {
@@ -1112,11 +1037,17 @@ class AnalysisService {
       );
 
       // Generate AI analysis
-      const technicalIndicators = {
+      const technicalIndicators: TechnicalIndicators = {
         currentPrice,
+        price_change_24h: historicalData.price_change_24h,
         rsi,
-        macd,
-        ma20: this.calculateSMA(prices, 20),
+        macd: {
+          value: macd.value,
+          signal: macd.signal,
+          histogram: macd.histogram,
+          interpretation: macd.interpretation
+        },
+        ma20,
         ma50,
         ma200,
         volumeChange: volumeRatio,
@@ -1163,56 +1094,7 @@ class AnalysisService {
 
       return {
         summary: marketSummary,
-        technicalAnalysis: {
-          rsi: {
-            value: rsi,
-            interpretation: this.interpretRSI(rsi)
-          },
-          macd: {
-            value: macd.value,
-            signal: macd.signal,
-            histogram: macd.histogram,
-            interpretation: macd.interpretation
-          },
-          movingAverages: {
-            ma20: this.calculateSMA(prices, 20),
-            ma50: this.calculateSMA(prices, 50),
-            ma200: this.calculateSMA(prices, 200),
-            interpretation: marketPhase
-          },
-          volume: {
-            current: volumes[volumes.length - 1],
-            change: volumeRatio,
-            interpretation: obvTrend
-          },
-          volatility: volatility
-        },
-        sentimentAnalysis: {
-          overall: sentiment.marketMood,
-          newsScore: parseFloat(sentiment.newsScore.toFixed(2)),
-          socialScore: parseFloat(sentiment.socialScore.toFixed(2)),
-          marketMood: sentiment.marketMood
-        },
-        aiPrediction: {
-          shortTerm: predictions.aiPrediction.shortTerm,
-          midTerm: predictions.aiPrediction.midTerm,
-          longTerm: predictions.aiPrediction.longTerm,
-          confidence: parseFloat((85 - volatility/ 2).toFixed(2)),
-          reasoning: [
-            marketSummary,
-            ...signals.map(s => `${s.indicator}: ${s.signal}`),
-            `Volume trend: ${obvTrend}`,
-            `StochRSI indicates ${this.interpretStochRSI(stochRSI)}`,
-            `Market is in ${marketPhase} phase`
-          ]
-        },
-        marketStructure: {
-          trend: marketPhase,
-          support,
-          resistance,
-          breakoutPotential: currentPrice > resistance ? 'Bullish Breakout Potential' :
-                            currentPrice < support ? 'Bearish Breakdown Risk' : 'Range Bound'
-        },
+        aiAnalysis,
         priceTargets: {
           '24H': {
             range: `$${priceTargets.shortTerm.low.toFixed(2)} - $${priceTargets.shortTerm.high.toFixed(2)}`,
@@ -1237,20 +1119,8 @@ class AnalysisService {
           stop: (support * 0.95).toString(),
           target: resistance.toString()
         },
-        marketConditions: {
-          trend: marketPhase,
-          support: support.toFixed(2),
-          resistance: resistance.toFixed(2),
-          distanceToResistance: ((resistance - currentPrice) / currentPrice * 100).toFixed(2),
-          distanceToSupport: ((currentPrice - support) / currentPrice * 100).toFixed(2)
-        },
-        sentiment: {
-          overall: sentiment.marketMood,
-          newsScore: sentiment.newsScore.toString(),
-          recentNews: newsItems.slice(0, 3).map(n => ({
-            title: n.title,
-            sentiment: n.sentiment
-          }))
+        marketStructure: {
+          trend: marketPhase
         }
       };
     } catch (error) {

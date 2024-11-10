@@ -73,6 +73,25 @@ export interface TradingStrategy {
   rationale: string[];
 }
 
+export interface TechnicalIndicators {
+  currentPrice: number;
+  price_change_24h: number;
+  rsi: number;
+  macd: {
+    value: number;
+    signal: number;
+    histogram: number;
+  };
+  ma20: number;
+  ma50: number;
+  ma200: number;
+  volumeChange: number;
+  marketPhase: string;
+  volatility: number;
+  support: number;
+  resistance: number;
+}
+
 export interface TechnicalSignals {
   trend: {
     primary: string;
@@ -80,9 +99,18 @@ export interface TechnicalSignals {
     strength: number;
   };
   momentum: {
-    rsi: { value: number; signal: string; };
-    macd: { value: number; signal: string; };
-    stochRSI: { value: number; signal: string; };
+    rsi: { 
+      value: number; 
+      signal: string; 
+    };
+    macd: { 
+      value: number; 
+      signal: string; 
+    };
+    stochRSI: { 
+      value: number; 
+      signal: string; 
+    };
   };
   volatility: {
     current: number;
@@ -112,5 +140,51 @@ interface MarketPhase {
     pivot: number;
     resistance: number;
     strongResistance: number;
+  };
+}
+
+export interface DetailedAnalysis {
+  summary: string;
+  aiAnalysis: string;
+  priceTargets: {
+    '24H': { range: string; confidence: string };
+    '7D': { range: string; confidence: string };
+    '30D': { range: string; confidence: string };
+  };
+  signals: Array<{
+    text: string;
+    importance: string;
+  }>;
+  strategy: {
+    position: string;
+    entry: string;
+    stop: string;
+    target: string;
+  };
+  marketStructure: {
+    trend: string;
+  };
+}
+
+interface AnalysisData {
+  summary: string;
+  aiAnalysis: string;
+  priceTargets: {
+    '24H': { range: string; confidence: string };
+    '7D': { range: string; confidence: string };
+    '30D': { range: string; confidence: string };
+  };
+  signals: Array<{
+    text: string;
+    importance: string;
+  }>;
+  strategy: {
+    position: string;
+    entry: string;
+    stop: string;
+    target: string;
+  };
+  marketStructure: {
+    trend: string;
   };
 } 

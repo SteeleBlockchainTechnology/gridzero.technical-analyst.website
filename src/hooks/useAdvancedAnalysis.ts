@@ -6,38 +6,27 @@ export function useAdvancedAnalysis(crypto: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchAnalysis = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await advancedAnalysis.getFullAnalysis(crypto);
+      setAnalysis(result);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching analysis:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch analysis');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    let mounted = true;
-
-    const fetchAnalysis = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const result = await advancedAnalysis.getFullAnalysis(crypto);
-        if (mounted) {
-          setAnalysis(result);
-          setError(null);
-        }
-      } catch (err) {
-        console.error('Error fetching analysis:', err);
-        if (mounted) {
-          setError(err instanceof Error ? err.message : 'Failed to fetch analysis');
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-
     fetchAnalysis();
-    const interval = setInterval(fetchAnalysis, 60000); // Update every minute
-
     return () => {
-      mounted = false;
-      clearInterval(interval);
+      // Cleanup if needed
     };
   }, [crypto]);
 
-  return { analysis, loading, error };
+  return { analysis, loading, error, refetch: fetchAnalysis };
 } 

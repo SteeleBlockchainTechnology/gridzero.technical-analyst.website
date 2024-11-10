@@ -124,9 +124,9 @@ class AdvancedAnalysisService {
       const currentPrice = prices[prices.length - 1];
 
       // Calculate moving averages
-      const ma20 = this.calculateSMA(prices, 20)[0];
-      const ma50 = this.calculateSMA(prices, 50)[0];
-      const ma200 = this.calculateSMA(prices, 200)[0];
+      const ma20 = this.calculateSMA(prices, 20);
+      const ma50 = this.calculateSMA(prices, 50);
+      const ma200 = this.calculateSMA(prices, 200);
 
       // Calculate trend structure
       const trendStructure = {
@@ -224,8 +224,8 @@ class AdvancedAnalysisService {
   private determineMarketPhase(prices: number[], volumeData: number[], trendStrength: number): string {
     try {
       const currentPrice = prices[prices.length - 1];
-      const ma50 = this.calculateSMA(prices, 50)[0];
-      const ma200 = this.calculateSMA(prices, 200)[0];
+      const ma50 = this.calculateSMA(prices, 50);
+      const ma200 = this.calculateSMA(prices, 200);
       
       // Calculate momentum
       const rsi = this.calculateRSI(prices);
@@ -607,8 +607,34 @@ class AdvancedAnalysisService {
   }
 
   private calculateConfidence(indicators: number[]): number {
-    const avgStrength = indicators.reduce((a, b) => a + b, 0) / indicators.length;
-    return Math.min(95, Math.max(30, avgStrength));
+    try {
+      if (!indicators || indicators.length === 0) {
+        return 50;
+      }
+
+      // Calculate weighted average of indicators
+      const weights = indicators.map((_, i) => 1 - (i * 0.1)); // Earlier indicators have more weight
+      const weightedSum = indicators.reduce((sum, val, i) => sum + val * weights[i], 0);
+      const weightSum = weights.reduce((a, b) => a + b, 0);
+      
+      // Calculate base confidence
+      const baseConfidence = weightedSum / weightSum;
+
+      // Calculate standard deviation to measure agreement between indicators
+      const mean = indicators.reduce((a, b) => a + b, 0) / indicators.length;
+      const variance = indicators.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / indicators.length;
+      const stdDev = Math.sqrt(variance);
+
+      // Adjust confidence based on indicator agreement
+      const agreementFactor = Math.max(0.5, 1 - (stdDev / 50));
+      const finalConfidence = baseConfidence * agreementFactor;
+
+      // Ensure confidence is within reasonable bounds
+      return Math.min(95, Math.max(30, finalConfidence));
+    } catch (error) {
+      console.error('Error calculating confidence:', error);
+      return 50;
+    }
   }
 
   private async calculateTechnicalSignals(priceData: any, volumeData: any): Promise<TechnicalSignals> {
@@ -622,23 +648,17 @@ class AdvancedAnalysisService {
       const prices = priceData.prices;
       const volumes = Array.isArray(volumeData) ? volumeData : [];
 
-      // Validate data quality
-      if (prices.some((p: number) => typeof p !== 'number' || isNaN(p) || p <= 0)) {
-        console.error('Invalid price values found:', prices.filter((p: number) => typeof p !== 'number' || isNaN(p) || p <= 0));
-        throw new Error('Invalid price data detected');
-      }
-
-      console.log('Technical Signals Input:', {
-        pricesLength: prices.length,
-        volumesLength: volumes.length,
-        samplePrices: prices.slice(-20), // Show last 20 points for debugging
-        sampleVolumes: volumes.slice(-20)
-      });
+      // Calculate moving averages first
+      const smaResults = {
+        ma20: this.calculateSMA(prices, 20),
+        ma50: this.calculateSMA(prices, 50),
+        ma200: this.calculateSMA(prices, 200)
+      };
 
       // Calculate indicators using full dataset
-      const rsi = this.calculateRSI(prices, 14); // 14-period RSI using all available data
+      const rsi = this.calculateRSI(prices, 14);
       const macd = {
-        value: this.calculateMACD(prices), // Using full dataset for EMA calculations
+        value: this.calculateMACD(prices),
         signal: this.calculateMACDSignal(prices),
         histogram: this.calculateMACDHistogram(prices)
       };
@@ -646,16 +666,16 @@ class AdvancedAnalysisService {
       
       // Calculate volume metrics using more data
       const volumeChange = volumes.length > 0 ? 
-        this.calculateVolumeRatio(volumes.slice(-100)) : 1; // Use last 100 periods for volume ratio
+        this.calculateVolumeRatio(volumes.slice(-100)) : 1;
       
       // Calculate volatility using more data
-      const volatility = this.calculateVolatility(prices.slice(-100)); // 100-period volatility
+      const volatility = this.calculateVolatility(prices.slice(-100));
 
-      // Calculate trends using full dataset
-      const primaryTrend = this.determineTrendDirection(prices);
+      // Calculate trends using full dataset and moving averages
+      const primaryTrend = this.determineTrendDirection(prices, smaResults);
       const secondaryTrend = this.determineSecondaryTrend(prices);
       const volumeProfile = this.calculateVolumeProfile(
-        prices.slice(-200), // Use last 200 periods for volume profile
+        prices.slice(-200),
         volumes.slice(-200)
       );
       const trendStrength = volumeProfile.strength || 0.5;
@@ -663,6 +683,7 @@ class AdvancedAnalysisService {
       console.log('Technical Calculations:', {
         dataPointsUsed: prices.length,
         currentPrice: prices[prices.length - 1],
+        movingAverages: smaResults,
         rsi,
         macd,
         stochRSI,
@@ -693,12 +714,12 @@ class AdvancedAnalysisService {
         },
         volatility: {
           current: Number(volatility.toFixed(2)),
-          trend: this.determineVolatilityTrend(prices.slice(-100)), // 100-period volatility trend
+          trend: this.determineVolatilityTrend(prices.slice(-100)),
           risk: this.categorizeVolatilityRisk(volatility)
         },
         volume: {
           change: Number(volumeChange.toFixed(2)),
-          trend: this.determineVolumeTrend(volumes.slice(-100)), // 100-period volume trend
+          trend: this.determineVolumeTrend(volumes.slice(-100)),
           significance: volumeProfile.strength > 0.7 ? 'strong' :
                        volumeProfile.strength > 0.4 ? 'moderate' : 'weak'
         }
@@ -707,6 +728,15 @@ class AdvancedAnalysisService {
       console.error('Error calculating technical signals:', error);
       throw error;
     }
+  }
+
+  // Update determineTrendDirection to use pre-calculated MAs
+  private determineTrendDirection(prices: number[], smaResults: { ma20: number; ma50: number; ma200: number }): string {
+    const { ma20, ma50, ma200 } = smaResults;
+    
+    if (ma20 > ma50 && ma50 > ma200) return 'bullish';
+    if (ma20 < ma50 && ma50 < ma200) return 'bearish';
+    return 'neutral';
   }
 
   private calculateRSI(prices: number[], period: number = 14): number {
@@ -928,16 +958,6 @@ class AdvancedAnalysisService {
       sellingPressure: 1 - (volumeSum / totalVolume),
       strength: maxVolume / totalVolume
     };
-  }
-
-  private determineTrendDirection(prices: number[]): string {
-    const ma20 = this.calculateSMA(prices, 20);
-    const ma50 = this.calculateSMA(prices, 50);
-    const ma200 = this.calculateSMA(prices, 200);
-    
-    if (ma20 > ma50 && ma50 > ma200) return 'bullish';
-    if (ma20 < ma50 && ma50 < ma200) return 'bearish';
-    return 'neutral';
   }
 
   private determineSecondaryTrend(prices: number[]): string {
@@ -1368,31 +1388,46 @@ class AdvancedAnalysisService {
     socialScore: number,
     marketScore: number
   ): { score: number; signal: string; confidence: number } {
-    // Weight the different components
-    const weights = {
-      news: 0.3,
-      social: 0.3,
-      market: 0.4
-    };
+    try {
+      // Weight the different components
+      const weights = {
+        news: 0.3,      // News sentiment weight
+        social: 0.3,    // Social sentiment weight
+        market: 0.4     // Market technical weight
+      };
 
-    // Calculate weighted score
-    const score = (
-      newsScore * weights.news +
-      socialScore * weights.social +
-      marketScore * weights.market
-    );
+      // Calculate weighted score
+      const score = (
+        newsScore * weights.news +
+        socialScore * weights.social +
+        marketScore * weights.market
+      );
 
-    // Calculate confidence based on agreement between components
-    const scores = [newsScore, socialScore, marketScore];
-    const avgDiff = Math.max(...scores) - Math.min(...scores);
-    const confidence = 100 - (avgDiff / 2);
+      // Calculate confidence based on multiple factors
+      const scores = [newsScore, socialScore, marketScore];
+      const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+      const deviation = Math.sqrt(
+        scores.reduce((sum, score) => sum + Math.pow(score - avgScore, 2), 0) / scores.length
+      );
+      
+      // Higher confidence when scores agree (low deviation)
+      // Lower confidence when scores disagree (high deviation)
+      const baseConfidence = 100 - (deviation * 2);
+      
+      // Adjust confidence based on data quality
+      const dataQualityFactor = Math.min(1, scores.filter(s => s !== 0).length / scores.length);
+      const finalConfidence = baseConfidence * dataQualityFactor;
 
-    return {
-      score,
-      signal: score > 60 ? 'bullish' :
-              score < 40 ? 'bearish' : 'neutral',
-      confidence: Math.min(95, Math.max(30, confidence))
-    };
+      return {
+        score: Number(score.toFixed(2)),
+        signal: score > 60 ? 'bullish' :
+                score < 40 ? 'bearish' : 'neutral',
+        confidence: Math.min(95, Math.max(30, finalConfidence))
+      };
+    } catch (error) {
+      console.error('Error calculating overall sentiment:', error);
+      return { score: 50, signal: 'neutral', confidence: 50 };
+    }
   }
 
   private getDefaultSentiment() {
@@ -1533,28 +1568,19 @@ class AdvancedAnalysisService {
     };
   }
 
-  // Add this method to the AdvancedAnalysisService class
-
-  private calculateSMA(prices: number[], period: number = 20): number[] {
+  // Update the calculateSMA method to return a single number for the most recent MA
+  private calculateSMA(prices: number[], period: number = 20): number {
     try {
-      if (!prices || prices.length === 0) return [0];
+      if (!prices || prices.length === 0) return 0;
       
-      const sma: number[] = [];
-      for (let i = 0; i < prices.length; i++) {
-        if (i < period - 1) {
-          sma.push(0);
-          continue;
-        }
-        
-        const slice = prices.slice(i - period + 1, i + 1);
-        const average = slice.reduce((sum, price) => sum + price, 0) / period;
-        sma.push(average);
-      }
+      // Calculate SMA for the most recent period
+      const slice = prices.slice(-period);
+      const average = slice.reduce((sum, price) => sum + price, 0) / period;
       
-      return sma;
+      return average;
     } catch (error) {
       console.error('Error calculating SMA:', error);
-      return [0];
+      return 0;
     }
   }
 }

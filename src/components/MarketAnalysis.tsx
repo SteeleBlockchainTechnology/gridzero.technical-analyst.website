@@ -13,6 +13,7 @@ interface Signal {
 
 interface AnalysisData {
   summary: string;
+  aiAnalysis: string;
   priceTargets: {
     '24H': { range: string; confidence: string };
     '7D': { range: string; confidence: string };
@@ -48,9 +49,9 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto }) => {
       } catch (err) {
         console.error('Error in MarketAnalysis:', err);
         setError('Failed to fetch market analysis');
-        // Set default analysis state
         setAnalysis({
           summary: 'Market analysis unavailable',
+          aiAnalysis: 'AI analysis unavailable',
           priceTargets: {
             '24H': { range: 'N/A', confidence: '0' },
             '7D': { range: 'N/A', confidence: '0' },
@@ -73,8 +74,6 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto }) => {
     };
 
     fetchAnalysis();
-    const interval = setInterval(fetchAnalysis, 60000);
-    return () => clearInterval(interval);
   }, [crypto]);
 
   if (loading) {
@@ -104,6 +103,18 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto }) => {
         </div>
       </div>
 
+      {/* AI Analysis */}
+      <div className="bg-slate-800 rounded-lg p-4">
+        <h3 className="font-medium flex items-center gap-2 mb-3">
+          <Brain className="w-5 h-5 text-purple-400" />
+          AI Analysis
+        </h3>
+        <div 
+          className="prose prose-invert max-w-none"
+          dangerouslySetInnerHTML={{ __html: analysis?.aiAnalysis || 'AI analysis unavailable' }}
+        />
+      </div>
+
       {/* Key Signals */}
       <div className="bg-slate-800 rounded-lg p-4">
         <h3 className="font-medium flex items-center gap-2 mb-3">
@@ -125,9 +136,6 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto }) => {
           ))}
         </div>
       </div>
-
-
-
     </div>
   );
 }; 
