@@ -72,7 +72,7 @@ export default function App() {
                 <div className="flex items-center gap-2">
                   <Coins className="w-8 h-8 text-blue-400" />
                   <Select onValueChange={(value) => setCrypto(value)} defaultValue={crypto}>
-                    <SelectTrigger className="w-[180px] bg-transparent border-none text-2xl font-bold text-blue-300">
+                    <SelectTrigger className="w-[180px] bg-transparent border-none text-2xl font-bold text-gray-200">
                       <SelectValue placeholder="Select Crypto" />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-800 border-gray-700">
