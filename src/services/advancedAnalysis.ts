@@ -462,12 +462,6 @@ class AdvancedAnalysisService {
     return (newsScore + sentimentScore) / 2;
   }
 
-  private calculateNewsScore(news: any[]): number {
-    if (!news?.length) return 50;
-    const positiveCount = news.filter(n => n.sentiment === 'positive').length;
-    const negativeCount = news.filter(n => n.sentiment === 'negative').length;
-    return ((positiveCount - negativeCount) / news.length + 1) * 50;
-  }
 
   private calculateNewsTrend(news: any[]): string {
     if (!news?.length) return 'neutral';
@@ -1213,34 +1207,7 @@ class AdvancedAnalysisService {
       return {
         marketCondition,
         technicalSignals,
-        sentimentAnalysis: {
-          overall: {
-            score: this.calculateSentimentScore(newsData?.news || [], sentiment),
-            signal: this.determineSentimentSignal(sentiment),
-            confidence: this.calculateConfidence([
-              technicalSignals.trend.strength * 100,
-              this.calculateNewsScore(newsData?.news || [])
-            ])
-          },
-          components: {
-            news: {
-              score: this.calculateNewsScore(newsData?.news || []),
-              recent: (newsData?.news || []).slice(0, 3).map(n => n.title),
-              trend: this.calculateNewsTrend(newsData?.news || [])
-            },
-            social: {
-              score: sentiment?.[0]?.volume || 50,
-              trend: sentiment?.[0]?.sentiment || 'neutral',
-              volume: technicalSignals.volume.change
-            },
-            market: {
-              score: (technicalSignals.momentum.rsi.value + 
-                     (technicalSignals.momentum.macd.value > 0 ? 60 : 40)) / 2,
-              dominance: technicalSignals.trend.strength * 100,
-              flow: technicalSignals.volume.change > 1 ? 'inflow' : 'outflow'
-            }
-          }
-        },
+        sentimentAnalysis: await this.calculateSentimentAnalysis(newsData?.news || [], sentiment, technicalSignals),
         predictions,
         riskAnalysis,
         tradingStrategy: await strategyGenerator.generateStrategy({
@@ -1256,6 +1223,203 @@ class AdvancedAnalysisService {
       console.error('Error in advanced analysis:', error);
       return this.getDefaultAnalysis(crypto);
     }
+  }
+
+  private async calculateSentimentAnalysis(newsData: any[], sentiment: any, technicalSignals: any) {
+    try {
+      // Calculate news sentiment
+      const newsScore = this.calculateNewsScore(newsData);
+      
+      // Calculate social sentiment using multiple factors
+      const socialSentiment = this.calculateSocialSentiment(
+        technicalSignals,
+        sentiment?.[0]?.volume || 50,
+        newsScore
+      );
+
+      // Calculate market sentiment
+      const marketSentiment = this.calculateMarketSentiment(technicalSignals);
+
+      // Calculate overall sentiment
+      const overallScore = this.calculateOverallSentiment(
+        newsScore,
+        socialSentiment.score,
+        marketSentiment.score
+      );
+
+      return {
+        overall: {
+          score: Number(overallScore.score.toFixed(2)),
+          signal: overallScore.signal,
+          confidence: Number(overallScore.confidence.toFixed(2))
+        },
+        components: {
+          news: {
+            score: Number(newsScore.toFixed(2)),
+            recent: newsData.slice(0, 3).map(n => n.title),
+            trend: this.calculateNewsTrend(newsData)
+          },
+          social: {
+            score: Number(socialSentiment.score.toFixed(2)),
+            trend: socialSentiment.trend,
+            volume: Number(socialSentiment.volume.toFixed(2))
+          },
+          market: {
+            score: Number(marketSentiment.score.toFixed(2)),
+            dominance: Number((technicalSignals.trend.strength * 100).toFixed(2)),
+            flow: marketSentiment.flow
+          }
+        }
+      };
+    } catch (error) {
+      console.error('Error calculating sentiment analysis:', error);
+      return this.getDefaultSentiment();
+    }
+  }
+
+  private calculateNewsScore(news: any[]): number {
+    if (!news?.length) return 50;
+    
+    const sentimentScores = news.map(item => {
+      // Weight recent news more heavily
+      const recencyWeight = 1.0; // Could be adjusted based on timestamp
+      
+      // Calculate base sentiment
+      let score = 50; // Neutral base
+      if (item.sentiment === 'positive') score = 75;
+      if (item.sentiment === 'negative') score = 25;
+      
+      // Apply weights
+      return score * recencyWeight;
+    });
+
+    return sentimentScores.reduce((a, b) => a + b, 0) / sentimentScores.length;
+  }
+
+  private calculateSocialSentiment(
+    technicalSignals: any,
+    socialVolume: number,
+    newsScore: number
+  ): { score: number; trend: string; volume: number } {
+    // Calculate social sentiment based on multiple factors
+    const volumeChange = technicalSignals.volume.change;
+    const momentum = technicalSignals.momentum;
+    
+    // Calculate social score using volume and momentum
+    const volumeScore = volumeChange > 1.5 ? 70 : 
+                     volumeChange > 1.0 ? 60 : 
+                     volumeChange < 0.5 ? 30 : 40;
+    
+    const momentumScore = momentum.rsi.value > 70 ? 75 :
+                         momentum.rsi.value > 60 ? 65 :
+                         momentum.rsi.value < 30 ? 25 :
+                         momentum.rsi.value < 40 ? 35 : 50;
+    
+    // Combine scores with weights
+    const score = (
+      volumeScore * 0.3 +
+      momentumScore * 0.4 +
+      newsScore * 0.3
+    );
+
+    // Determine trend
+    const trend = score > 60 ? 'bullish' :
+                 score < 40 ? 'bearish' : 'neutral';
+
+    return {
+      score,
+      trend,
+      volume: volumeChange
+    };
+  }
+
+  private calculateMarketSentiment(technicalSignals: any) {
+    const { rsi, macd, stochRSI } = technicalSignals.momentum;
+    const { primary: trend, strength } = technicalSignals.trend;
+    
+    // Calculate market score based on technical indicators
+    const rsiScore = rsi.value > 70 ? 75 :
+                  rsi.value > 60 ? 65 :
+                  rsi.value < 30 ? 25 :
+                  rsi.value < 40 ? 35 : 50;
+    
+    const macdScore = macd.signal.includes('bullish') ? 65 :
+                     macd.signal.includes('bearish') ? 35 : 50;
+    
+    const trendScore = trend === 'bullish' ? 70 :
+                      trend === 'bearish' ? 30 : 50;
+    
+    // Combine scores with weights
+    const score = (
+      rsiScore * 0.3 +
+      macdScore * 0.3 +
+      trendScore * 0.4
+    );
+
+    return {
+      score,
+      flow: score > 60 ? 'inflow' :
+            score < 40 ? 'outflow' : 'stable'
+    };
+  }
+
+  private calculateOverallSentiment(
+    newsScore: number,
+    socialScore: number,
+    marketScore: number
+  ): { score: number; signal: string; confidence: number } {
+    // Weight the different components
+    const weights = {
+      news: 0.3,
+      social: 0.3,
+      market: 0.4
+    };
+
+    // Calculate weighted score
+    const score = (
+      newsScore * weights.news +
+      socialScore * weights.social +
+      marketScore * weights.market
+    );
+
+    // Calculate confidence based on agreement between components
+    const scores = [newsScore, socialScore, marketScore];
+    const avgDiff = Math.max(...scores) - Math.min(...scores);
+    const confidence = 100 - (avgDiff / 2);
+
+    return {
+      score,
+      signal: score > 60 ? 'bullish' :
+              score < 40 ? 'bearish' : 'neutral',
+      confidence: Math.min(95, Math.max(30, confidence))
+    };
+  }
+
+  private getDefaultSentiment() {
+    return {
+      overall: {
+        score: 50,
+        signal: 'neutral',
+        confidence: 50
+      },
+      components: {
+        news: {
+          score: 50,
+          recent: [],
+          trend: 'neutral'
+        },
+        social: {
+          score: 50,
+          trend: 'neutral',
+          volume: 1
+        },
+        market: {
+          score: 50,
+          dominance: 50,
+          flow: 'stable'
+        }
+      }
+    };
   }
 
   private determineSentimentSignal(sentiment: any): string {
