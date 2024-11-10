@@ -1047,7 +1047,7 @@ class AnalysisService {
           histogram: macd.histogram,
           interpretation: macd.interpretation
         },
-        ma20,
+        ma20: this.calculateSMA(prices, 20),
         ma50,
         ma200,
         volumeChange: volumeRatio,

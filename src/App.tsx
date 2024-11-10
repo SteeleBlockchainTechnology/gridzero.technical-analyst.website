@@ -1,34 +1,40 @@
-import React, { useEffect, useState } from 'react';
-import { Layout } from './components/Layout';
-import { NewsPanel } from './components/NewsPanel';
-import { TradingView } from './components/TradingView';
-import { MarketAnalysis } from './components/MarketAnalysis';
-import { SentimentAnalysis } from './components/SentimentAnalysis';
-import { AdvancedAnalysis } from './components/AdvancedAnalysis';
-import { api } from './services/api';
-import type { NewsItem, SentimentData, PredictionData, CryptoPrice } from './services/types';
-import { Coins, Clock } from 'lucide-react';
+'use client'
 
-function App() {
-  const [crypto, setCrypto] = useState('bitcoin');
-  const [news, setNews] = useState<NewsItem[]>([]);
-  const [sentiment, setSentiment] = useState<SentimentData[]>([]);
+import React, { useEffect, useState } from 'react'
+import { Layout } from './components/Layout'
+import { NewsPanel } from './components/NewsPanel'
+import { TradingView } from './components/TradingView'
+import { MarketAnalysis } from './components/MarketAnalysis'
+import { SentimentAnalysis } from './components/SentimentAnalysis'
+import { AdvancedAnalysis } from './components/AdvancedAnalysis'
+import { api } from './services/api'
+import type { NewsItem, SentimentData, PredictionData, CryptoPrice } from './services/types'
+import { Coins, Clock, TrendingUp, TrendingDown } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
+import { Button } from "./components/ui/button"
+
+export default function App() {
+  const [crypto, setCrypto] = useState('bitcoin')
+  const [news, setNews] = useState<NewsItem[]>([])
+  const [sentiment, setSentiment] = useState<SentimentData[]>([])
   const [price, setPrice] = useState<CryptoPrice>({
     price: 0,
     change24h: 0,
     timestamp: Date.now()
-  });
-  const [predictions, setPredictions] = useState<PredictionData[]>([]);
-  const [timeframe, setTimeframe] = useState('1D');
+  })
+  const [predictions, setPredictions] = useState<PredictionData[]>([])
+  const [timeframe, setTimeframe] = useState('1D')
 
-  const timeframes = ['1H', '4H', '1D', '1W', '1M'];
+  const timeframes = ['1H', '4H', '1D', '1W', '1M']
   const cryptos = [
     { id: 'bitcoin', symbol: 'BTC' },
     { id: 'ethereum', symbol: 'ETH' },
     { id: 'binancecoin', symbol: 'BNB' },
     { id: 'cardano', symbol: 'ADA' },
     { id: 'solana', symbol: 'SOL' }
-  ];
+  ]
 
   useEffect(() => {
     const fetchData = async () => {
@@ -38,101 +44,177 @@ function App() {
           api.getSentiment(crypto),
           api.getPrice(crypto),
           api.getPredictions(crypto)
-        ]);
+        ])
 
-        setNews(newsData.news);
-        setSentiment(sentimentData);
-        setPrice(priceData);
-        setPredictions(predictionsData);
+        setNews(newsData.news)
+        setSentiment(sentimentData)
+        setPrice(priceData)
+        setPredictions(predictionsData)
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('Error fetching data:', error)
       }
-    };
+    }
 
-    fetchData();
-    const interval = setInterval(fetchData, 60000);
+    fetchData()
+    const interval = setInterval(fetchData, 60000)
 
-    return () => clearInterval(interval);
-  }, [crypto]);
+    return () => clearInterval(interval)
+  }, [crypto])
 
   return (
     <Layout>
-      <div className="container mx-auto p-4 text-white">
-        {/* Header - Updated styling */}
-        <div className="flex items-center justify-between mb-6 bg-slate-800/50 p-4 rounded-lg backdrop-blur-sm">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <Coins className="w-6 h-6 text-blue-400" />
-              <select 
-                value={crypto}
-                onChange={(e) => setCrypto(e.target.value)}
-                className="bg-slate-750 border-none rounded-lg text-lg font-semibold focus:ring-2 focus:ring-blue-500 text-white"
-              >
-                {cryptos.map(({ id, symbol }) => (
-                  <option key={id} value={id} className="text-white bg-slate-800">
-                    {symbol}/USD
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-3">
-              <Clock className="w-5 h-5 text-blue-400" />
-              <div className="flex gap-1 bg-slate-800 p-1 rounded-lg">
-                {timeframes.map((tf) => (
-                  <button
-                    key={tf}
-                    onClick={() => setTimeframe(tf)}
-                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                      timeframe === tf 
-                        ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' 
-                        : 'text-slate-400 hover:bg-slate-700 hover:text-white'
-                    }`}
-                  >
-                    {tf}
-                  </button>
-                ))}
+      <div className="container mx-auto p-4 text-white min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
+        {/* Header - Futuristic design */}
+        <Card className="mb-6 bg-black/30 border-none backdrop-blur-lg">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <Coins className="w-8 h-8 text-blue-400" />
+                  <Select onValueChange={(value) => setCrypto(value)} defaultValue={crypto}>
+                    <SelectTrigger className="w-[180px] bg-transparent border-none text-2xl font-bold text-blue-300">
+                      <SelectValue placeholder="Select Crypto" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700">
+                      {cryptos.map(({ id, symbol }) => (
+                        <SelectItem key={id} value={id} className="text-white hover:bg-gray-700">
+                          {symbol}/USD
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Clock className="w-6 h-6 text-blue-400" />
+                  <div className="flex gap-1 bg-gray-800/50 p-1 rounded-full">
+                    {timeframes.map((tf) => (
+                      <Button
+                        key={tf}
+                        onClick={() => setTimeframe(tf)}
+                        variant={timeframe === tf ? "default" : "ghost"}
+                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                          timeframe === tf 
+                            ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' 
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        {tf}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-3xl font-bold">${price.price.toLocaleString()}</span>
+                <span className={`flex items-center ${price.change24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {price.change24h >= 0 ? <TrendingUp className="w-5 h-5 mr-1" /> : <TrendingDown className="w-5 h-5 mr-1" />}
+                  {Math.abs(price.change24h).toFixed(2)}%
+                </span>
               </div>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        {/* Main Content - Updated grid layout */}
+        {/* Main Content - Enhanced grid layout with animations */}
         <div className="grid grid-cols-12 gap-6">
           {/* Left Column - Chart and Analysis */}
           <div className="col-span-8 space-y-6">
-            <div className="bg-slate-800 rounded-xl overflow-hidden shadow-xl shadow-black/10">
-              <TradingView 
-                crypto={crypto} 
-                timeframe={timeframe}
-                price={price}
-              />
-            </div>
-            <div className="bg-slate-800 rounded-xl p-6 shadow-xl shadow-black/10">
-              <MarketAnalysis crypto={crypto} />
-            </div>
-            <div className="bg-slate-800 rounded-xl p-6 shadow-xl shadow-black/10">
-              <AdvancedAnalysis crypto={crypto} />
-            </div>
+            <AnimatePresence>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.5 }}
+              >
+                <Card className="overflow-hidden border-none bg-black/30 backdrop-blur-lg">
+                  <CardContent className="p-0">
+                    <TradingView 
+                      crypto={crypto} 
+                      timeframe={timeframe}
+                      price={price}
+                    />
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </AnimatePresence>
+            <AnimatePresence>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+              >
+                <Card className="border-none bg-black/30 backdrop-blur-lg">
+                  <CardHeader>
+                    <CardTitle className="text-xl font-bold text-blue-300">Market Analysis</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <MarketAnalysis crypto={crypto} />
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </AnimatePresence>
+            <AnimatePresence>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+              >
+                <Card className="border-none bg-black/30 backdrop-blur-lg">
+                  <CardHeader>
+                    <CardTitle className="text-xl font-bold text-blue-300">Advanced Analysis</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <AdvancedAnalysis crypto={crypto} />
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </AnimatePresence>
           </div>
 
-          {/* Right Column - Predictions, Alerts, News */}
+          {/* Right Column - Sentiment Analysis and News */}
           <div className="col-span-4 space-y-6">
-       
-
-            <div className="bg-slate-800 rounded-xl p-6 shadow-xl shadow-black/10">
-              <SentimentAnalysis 
-                crypto={crypto} 
-                sentimentData={sentiment}
-              />
-            </div>
-            <div className="bg-slate-800 rounded-xl p-6 shadow-xl shadow-black/10 max-h-[600px] overflow-y-auto">
-              <NewsPanel crypto={crypto} news={news} />
-            </div>
+            <AnimatePresence>
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.5 }}
+              >
+                <Card className="border-none bg-black/30 backdrop-blur-lg">
+                  <CardHeader>
+                    <CardTitle className="text-xl font-bold text-blue-300">Sentiment Analysis</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <SentimentAnalysis 
+                      crypto={crypto} 
+                      sentimentData={sentiment}
+                    />
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </AnimatePresence>
+            <AnimatePresence>
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+              >
+                <Card className="border-none bg-black/30 backdrop-blur-lg max-h-[600px] overflow-y-auto">
+                  <CardHeader>
+                    <CardTitle className="text-xl font-bold text-blue-300">Latest News</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <NewsPanel crypto={crypto} news={news} />
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
       </div>
     </Layout>
-  );
+  )
 }
-
-export default App;
