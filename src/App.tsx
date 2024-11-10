@@ -5,7 +5,6 @@ import { Layout } from './components/Layout'
 import { NewsPanel } from './components/NewsPanel'
 import { TradingView } from './components/TradingView'
 import { MarketAnalysis } from './components/MarketAnalysis'
-import { SentimentAnalysis } from './components/SentimentAnalysis'
 import { AdvancedAnalysis } from './components/AdvancedAnalysis'
 import { api } from './services/api'
 import type { NewsItem, SentimentData, PredictionData, CryptoPrice } from './services/types'
@@ -105,7 +104,7 @@ export default function App() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-3xl font-bold">${price.price.toLocaleString()}</span>
+                <span className="text-3xl text-white font-bold">${price.price.toLocaleString()}</span>
                 <span className={`flex items-center ${price.change24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                   {price.change24h >= 0 ? <TrendingUp className="w-5 h-5 mr-1" /> : <TrendingDown className="w-5 h-5 mr-1" />}
                   {Math.abs(price.change24h).toFixed(2)}%
@@ -126,7 +125,7 @@ export default function App() {
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.5 }}
               >
-                <Card className="overflow-hidden border-none bg-black/30 backdrop-blur-lg">
+                <Card className="overflow-hidden border-none text-white/60 bg-black/30 backdrop-blur-lg">
                   <CardContent className="p-0">
                     <TradingView 
                       crypto={crypto} 
@@ -182,17 +181,7 @@ export default function App() {
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.5 }}
               >
-                <Card className="border-none bg-black/30 backdrop-blur-lg">
-                  <CardHeader>
-                    <CardTitle className="text-xl font-bold text-blue-300">Sentiment Analysis</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <SentimentAnalysis 
-                      crypto={crypto} 
-                      sentimentData={sentiment}
-                    />
-                  </CardContent>
-                </Card>
+      
               </motion.div>
             </AnimatePresence>
             <AnimatePresence>
@@ -202,11 +191,11 @@ export default function App() {
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.5, delay: 0.2 }}
               >
-                <Card className="border-none bg-black/30 backdrop-blur-lg max-h-[600px] overflow-y-auto">
+                <Card className="border-none bg-black/30 backdrop-blur-lg max-h-[800px] overflow-y-auto">
                   <CardHeader>
                     <CardTitle className="text-xl font-bold text-blue-300">Latest News</CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-4">
                     <NewsPanel crypto={crypto} news={news} />
                   </CardContent>
                 </Card>
