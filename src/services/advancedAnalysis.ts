@@ -121,19 +121,14 @@ class AdvancedAnalysisService {
         throw new Error('Invalid input data');
       }
 
-      // Calculate recent price range and use it for support/resistance
-      const recentPrices = prices.slice(-20); // Last 20 periods
-      const highPrice = Math.max(...recentPrices);
-      const lowPrice = Math.min(...recentPrices);
-      const priceRange = highPrice - lowPrice;
+      const currentPrice = prices[prices.length - 1];
 
-      // Calculate moving averages and use them
+      // Calculate moving averages
       const ma20 = this.calculateSMA(prices, 20)[0];
       const ma50 = this.calculateSMA(prices, 50)[0];
       const ma200 = this.calculateSMA(prices, 200)[0];
 
-      // Use moving averages to determine trend structure
-      const currentPrice = prices[prices.length - 1];
+      // Calculate trend structure
       const trendStructure = {
         aboveMA20: currentPrice > ma20,
         aboveMA50: currentPrice > ma50,
@@ -142,64 +137,83 @@ class AdvancedAnalysisService {
         ma20AboveMA50: ma20 > ma50
       };
 
-      // Calculate trend strength using price range and moving averages
-      const trendStrength = await this.analyzeTrendStrength(prices, volumeData);
-      const trendStrengthAdjusted = trendStrength * (
-        (trendStructure.aboveMA20 ? 1.1 : 0.9) *
-        (trendStructure.aboveMA50 ? 1.1 : 0.9) *
-        (trendStructure.aboveMA200 ? 1.1 : 0.9)
-      );
+      // Calculate support and resistance using recent price action
+      const recentPrices = prices.slice(-20);
+      const highPrice = Math.max(...recentPrices);
+      const lowPrice = Math.min(...recentPrices);
 
-      // Calculate volume profile
-      const volumeProfile = this.calculateVolumeProfile(prices, volumeData);
-
-      // Determine phase using trend structure
-      const phase = this.determineMarketPhase(
-        prices,
-        volumeData,
-        trendStrengthAdjusted
-      );
-
-      // Calculate phase strength using all components
-      const phaseStrength = this.calculatePhaseStrength(
-        phase,
-        trendStrengthAdjusted,
-        volumeProfile
-      );
-
-      // Calculate dynamic support/resistance using price range and MAs
+      // Calculate dynamic support and resistance using multiple factors
       const support = Math.max(
         lowPrice,
-        Math.min(ma20, ma50, ma200) * 0.99
-      );
-      const resistance = Math.min(
-        highPrice,
-        Math.max(ma20, ma50, ma200) * 1.01
+        Math.min(ma20, ma50) * 0.995, // 0.5% below lowest MA
+        currentPrice * 0.95 // Maximum 5% below current price
       );
 
-      // Calculate volatility and confidence
-      const volatility = this.calculateVolatility(prices);
-      const volatilityFactor = Math.max(0.5, 1 - (volatility / 100));
+      const resistance = Math.max(
+        Math.min(
+          highPrice,
+          Math.max(ma20, ma50) * 1.005, // 0.5% above highest MA
+          currentPrice * 1.05 // Maximum 5% above current price
+        ),
+        support * 1.01 // Ensure resistance is above support
+      );
 
-      // Calculate confidence using all factors
+      // Determine market phase
+      let phase = 'sideways';
+      if (trendStructure.aboveMA50 && trendStructure.ma50AboveMA200 && trendStructure.ma20AboveMA50) {
+        phase = 'bullish';
+      } else if (!trendStructure.aboveMA50 && !trendStructure.ma50AboveMA200 && !trendStructure.ma20AboveMA50) {
+        phase = 'bearish';
+      } else if (trendStructure.aboveMA200 && !trendStructure.aboveMA50) {
+        phase = 'correction';
+      } else if (!trendStructure.aboveMA200 && trendStructure.aboveMA50) {
+        phase = 'recovery';
+      }
+
+      // Calculate trend strength
+      const trendStrength = await this.analyzeTrendStrength(prices, volumeData);
+      const phaseStrength = Math.abs(trendStrength);
+
+      // Calculate confidence
       const confidence = this.calculateConfidence([
         phaseStrength * 100,
-        volatilityFactor * 100,
-        trendStrengthAdjusted * 100,
-        (priceRange / currentPrice) * 50 // Use price range for confidence
+        trendStructure.aboveMA50 ? 60 : 40,
+        trendStructure.aboveMA200 ? 60 : 40,
+        (currentPrice - support) / (resistance - support) * 100
       ]);
+
+      // Ensure all values are valid numbers
+      const keyLevels = {
+        strongSupport: Number((support * 0.99).toFixed(2)),
+        support: Number(support.toFixed(2)),
+        pivot: Number(currentPrice.toFixed(2)),
+        resistance: Number(resistance.toFixed(2)),
+        strongResistance: Number((resistance * 1.01).toFixed(2))
+      };
+
+      // Validate key levels
+      if (isNaN(keyLevels.resistance) || keyLevels.resistance === 0) {
+        keyLevels.resistance = Number((currentPrice * 1.05).toFixed(2)); // 5% above current price
+      }
+      if (isNaN(keyLevels.strongResistance) || keyLevels.strongResistance === 0) {
+        keyLevels.strongResistance = Number((keyLevels.resistance * 1.01).toFixed(2));
+      }
+
+      console.log('Market Phase Calculation:', {
+        currentPrice,
+        ma20,
+        ma50,
+        ma200,
+        support,
+        resistance,
+        keyLevels
+      });
 
       return {
         phase,
         strength: Number(phaseStrength.toFixed(2)),
         confidence: Number(confidence.toFixed(2)),
-        keyLevels: {
-          strongSupport: Number((support * 0.99).toFixed(2)),
-          support: Number(support.toFixed(2)),
-          pivot: Number(currentPrice.toFixed(2)),
-          resistance: Number(resistance.toFixed(2)),
-          strongResistance: Number((resistance * 1.01).toFixed(2))
-        }
+        keyLevels
       };
     } catch (error) {
       console.error('Error calculating market phase:', error);
@@ -207,29 +221,33 @@ class AdvancedAnalysisService {
     }
   }
 
-  private determineMarketPhase(prices: number[], volumeData: number[], trendStrength: number) {
+  private determineMarketPhase(prices: number[], volumeData: number[], trendStrength: number): string {
     try {
-      if (!prices?.length || !volumeData?.length) {
-        throw new Error('Invalid input data');
-      }
-
       const currentPrice = prices[prices.length - 1];
-      const ma50 = this.calculateSMA(prices, 50)[0];  // Get first element of array
-      const ma200 = this.calculateSMA(prices, 200)[0]; // Get first element of array
+      const ma50 = this.calculateSMA(prices, 50)[0];
+      const ma200 = this.calculateSMA(prices, 200)[0];
       
-      if (currentPrice > ma50 && ma50 > ma200 && trendStrength > 0.7) {
-        return 'markup';
-      } else if (currentPrice < ma50 && ma50 < ma200 && trendStrength < -0.7) {
-        return 'markdown';
-      } else if (trendStrength > 0.3) {
-        return 'accumulation';
-      } else if (trendStrength < -0.3) {
-        return 'distribution';
+      // Calculate momentum
+      const rsi = this.calculateRSI(prices);
+      const macd = this.calculateMACD(prices);
+      
+      // Determine phase based on multiple factors
+      if (currentPrice > ma50 && ma50 > ma200 && trendStrength > 0.5 && rsi > 50) {
+        return 'bullish';
+      } else if (currentPrice < ma50 && ma50 < ma200 && trendStrength < -0.5 && rsi < 50) {
+        return 'bearish';
+      } else if (currentPrice > ma200 && currentPrice < ma50) {
+        return 'correction';
+      } else if (currentPrice < ma200 && currentPrice > ma50) {
+        return 'recovery';
+      } else if (Math.abs(trendStrength) < 0.3) {
+        return 'sideways';
       }
-      return 'sideways';
+      
+      return 'neutral';
     } catch (error) {
       console.error('Error determining market phase:', error);
-      return 'sideways';
+      return 'neutral';
     }
   }
 
@@ -272,50 +290,108 @@ class AdvancedAnalysisService {
     sentiment: number;
   }) {
     try {
-      // Prepare features for ML model
-      const features = await this.prepareFeatures(data);
+      // Calculate base volatility factor (normalized to smaller range)
+      const volatilityFactor = Math.min(0.05, data.volatility / 1000); // Max 5% impact
       
-      // Get prediction model
-      const model = await this.getTrendModel();
+      // Calculate sentiment impact (normalized to smaller range)
+      const sentimentFactor = ((data.sentiment - 50) / 100) * 0.02; // Max 2% impact
       
-      // Make predictions for different timeframes
-      const shortTerm = await this.makePrediction(model, features, '24h');
-      const midTerm = await this.makePrediction(model, features, '7d');
-      const longTerm = await this.makePrediction(model, features, '30d');
+      // Calculate recent trend (using last 20 periods)
+      const recentPrices = data.prices.slice(-20);
+      const trendFactor = Math.min(0.03, Math.max(-0.03,
+        (recentPrices[recentPrices.length - 1] - recentPrices[0]) / recentPrices[0]
+      )); // Max 3% impact
 
-      // Calculate price targets using Fibonacci levels
-      const priceTargets = this.calculatePriceTargets(
-        data.currentPrice,
-        data.prices,
-        data.volatility,
-        Math.min(...data.prices.slice(-20)),  // Support
-        Math.max(...data.prices.slice(-20))   // Resistance
-      );
+      // Calculate timeframe-specific ranges with tighter bounds
+      const shortTermRange = {
+        low: data.currentPrice * (1 - (volatilityFactor + 0.01)), // Max 6% down
+        high: data.currentPrice * (1 + (volatilityFactor + 0.01))  // Max 6% up
+      };
 
-      // Use fib236 for additional support/resistance levels
-      const { shortTerm: st, midTerm: mt, longTerm: lt } = priceTargets;
-      
+      const midTermRange = {
+        low: data.currentPrice * (1 - (volatilityFactor * 2 + 0.02)), // Max 12% down
+        high: data.currentPrice * (1 + (volatilityFactor * 2 + 0.02))  // Max 12% up
+      };
+
+      const longTermRange = {
+        low: data.currentPrice * (1 - (volatilityFactor * 3 + 0.03)), // Max 18% down
+        high: data.currentPrice * (1 + (volatilityFactor * 3 + 0.03))  // Max 18% up
+      };
+
+      // Adjust ranges based on sentiment and trend
+      const adjustRanges = (range: { low: number; high: number }) => {
+        const sentimentAdjustment = data.currentPrice * sentimentFactor;
+        const trendAdjustment = data.currentPrice * trendFactor;
+        
+        return {
+          low: Math.max(range.low + sentimentAdjustment + trendAdjustment, 
+                       data.currentPrice * 0.85), // Prevent extreme lows
+          high: Math.min(range.high + sentimentAdjustment + trendAdjustment, 
+                        data.currentPrice * 1.15)  // Prevent extreme highs
+        };
+      };
+
+      // Calculate confidence levels based on timeframe and data quality
+      const baseConfidence = Math.min(90, Math.max(50, 
+        70 - (volatilityFactor * 100) + (Math.abs(sentimentFactor) * 100)
+      ));
+
       return {
         shortTerm: {
-          price: st,
-          confidence: shortTerm.confidence,
-          signals: shortTerm.signals
+          price: adjustRanges(shortTermRange),
+          confidence: baseConfidence,
+          signals: this.generatePredictionSignals(
+            shortTermRange.low,
+            shortTermRange.high,
+            volatilityFactor
+          )
         },
         midTerm: {
-          price: mt,
-          confidence: midTerm.confidence,
-          signals: midTerm.signals
+          price: adjustRanges(midTermRange),
+          confidence: Math.max(40, baseConfidence * 0.9),
+          signals: this.generatePredictionSignals(
+            midTermRange.low,
+            midTermRange.high,
+            volatilityFactor * 2
+          )
         },
         longTerm: {
-          price: lt,
-          confidence: longTerm.confidence,
-          signals: longTerm.signals
+          price: adjustRanges(longTermRange),
+          confidence: Math.max(30, baseConfidence * 0.8),
+          signals: this.generatePredictionSignals(
+            longTermRange.low,
+            longTermRange.high,
+            volatilityFactor * 3
+          )
         }
       };
     } catch (error) {
       console.error('Error in price predictions:', error);
       return this.getDefaultPredictions(data.currentPrice);
     }
+  }
+
+  private generatePredictionSignals(low: number, high: number, volatility: number): string[] {
+    const signals: string[] = [];
+    const range = (high - low) / low;
+    
+    // Add price movement signals with more realistic thresholds
+    if (range > 0.05) {
+      signals.push('Moderate price movement expected');
+    } else if (range > 0.10) {
+      signals.push('Significant price movement expected');
+    } else {
+      signals.push('Stable price action expected');
+    }
+
+    // Add volatility signals
+    if (volatility > 0.03) {
+      signals.push('Higher than average volatility');
+    } else if (volatility < 0.01) {
+      signals.push('Lower than average volatility');
+    }
+
+    return signals;
   }
 
   private async analyzeRisk(technicalData: any, sentimentData: any) {
@@ -408,31 +484,45 @@ class AdvancedAnalysisService {
   }
 
   private prepareFeatures(data: any) {
-    if (!data?.prices?.length) {
-      throw new Error('Invalid price data for feature preparation');
-    }
+    try {
+      if (!data?.prices?.length) {
+        throw new Error('Invalid price data for feature preparation');
+      }
 
-    const window = 20;
-    const features = [];
-    
-    // Calculate technical indicators
-    const rsi = this.calculateRSI(data.prices);
-    const macd = this.calculateMACD(data.prices);
-    const bb = this.calculateBollingerBands(data.prices);
-    const atr = this.calculateATR(data.prices);
-    
-    for (let i = 0; i < window; i++) {
-      features.push([
-        data.prices[data.prices.length - window + i] || 0,
-        data.volumes[data.volumes.length - window + i] || 0,
-        rsi || 50,
-        macd || 0,
-        bb?.middle || data.prices[data.prices.length - window + i] || 0,
-        atr || 0
-      ]);
+      // Calculate technical indicators
+      const rsi = this.calculateRSI(data.prices);
+      const macd = this.calculateMACD(data.prices);
+      const volatility = this.calculateVolatility(data.prices);
+      const volumeChange = data.volumes?.length > 0 ? 
+        this.calculateVolumeRatio(data.volumes) : 1;
+
+      // Create feature vector with exactly 4 features
+      const features = [
+        [
+          rsi / 100, // Normalize RSI to 0-1 range
+          macd, // MACD
+          volatility / 100, // Normalize volatility
+          volumeChange // Volume change ratio
+        ]
+      ];
+
+      console.log('Prepared Features:', {
+        shape: [1, 4],
+        features: features[0]
+      });
+      
+      // Return as 2D tensor with shape [1, 4]
+      return tf.tensor2d(features);
+    } catch (error) {
+      console.error('Error preparing features:', error);
+      // Return default feature tensor with correct shape [1, 4]
+      return tf.tensor2d([[
+        0.5,  // default normalized RSI
+        0,    // default MACD
+        0.3,  // default normalized volatility
+        1     // default volume ratio
+      ]]);
     }
-    
-    return tf.tensor3d([features]);
   }
 
   private calculateBollingerBands(prices: number[], period: number = 20, multiplier: number = 2) {
@@ -465,66 +555,61 @@ class AdvancedAnalysisService {
 
   private async makePrediction(
     model: tf.LayersModel,
-    features: tf.Tensor3D,
+    features: tf.Tensor2D,
     timeframe: string
-  ) {
-    const prediction = await model.predict(features) as tf.Tensor;
-    const [low, high] = await prediction.data();
-    prediction.dispose();
-    
-    // Calculate confidence based on prediction spread and timeframe
-    const spread = (high - low) / ((high + low) / 2);
-    const timeframeMultiplier = timeframe === '24h' ? 1 :
-                               timeframe === '7d' ? 0.9 :
-                               0.8;
-    
-    const confidence = Math.min(95, Math.max(30,
-      (1 - spread) * 100 * timeframeMultiplier
-    ));
-    
-    // Generate signals based on prediction
-    const signals = this.generatePredictionSignals(low, high, spread);
-    
-    return {
-      price: { low, high },
-      confidence,
-      signals
-    };
-  }
+  ): Promise<{ price: { low: number; high: number }; confidence: number; signals: string[] }> {
+    try {
+      // Verify input shape
+      const shape = features.shape;
+      if (shape[1] !== 4) {
+        throw new Error(`Invalid feature shape: expected [null, 4] but got [${shape[0]}, ${shape[1]}]`);
+      }
 
-  private generatePredictionSignals(low: number, high: number, spread: number) {
-    const signals = [];
-    const midpoint = (high + low) / 2;
-    
-    // Add price movement signal
-    if (high > midpoint * 1.1) {
-      signals.push('Strong upward potential');
-    } else if (low < midpoint * 0.9) {
-      signals.push('Significant downside risk');
-    }
-    
-    // Add volatility signal
-    if (spread > 0.2) {
-      signals.push('High volatility expected');
-    } else if (spread < 0.05) {
-      signals.push('Low volatility expected');
-    }
-    
-    // Add confidence signal
-    if (spread < 0.1) {
-      signals.push('High prediction confidence');
-    } else if (spread > 0.3) {
-      signals.push('Low prediction confidence');
-    }
-    
-    return signals;
-  }
+      // Make prediction
+      const prediction = await model.predict(features) as tf.Tensor;
+      const [predictedValue] = await prediction.data();
+      
+      // Calculate price range based on timeframe and volatility
+      const baseRange = timeframe === '24h' ? 0.02 : 
+                       timeframe === '7d' ? 0.05 : 0.10;
+      
+      const currentPrice = features.arraySync()[0][0];
+      const predictedChange = (predictedValue - currentPrice) / currentPrice;
+      
+      // Calculate confidence based on model output
+      const confidence = Math.min(95, Math.max(30,
+        (1 - Math.abs(predictedChange)) * 100 * 
+        (timeframe === '24h' ? 1 : timeframe === '7d' ? 0.9 : 0.8)
+      ));
 
-  // Update the calculateSMA method to return a single number
-  private calculateSMA(prices: number[], period: number = 20): number[] {
-    if (!prices || prices.length === 0) return [0];
-    const slice = prices.slice(-period);
-    return [slice.reduce((sum, price) => sum + price, 0) / slice.length];
+      // Generate price range
+      const low = currentPrice * (1 + predictedChange - baseRange);
+      const high = currentPrice * (1 + predictedChange + baseRange);
+
+      // Clean up tensors
+      prediction.dispose();
+      features.dispose();
+
+      // Generate signals
+      const signals = this.generatePredictionSignals(low, high, baseRange);
+
+      return {
+        price: { low, high },
+        confidence,
+        signals
+      };
+    } catch (error) {
+      console.error('Error making prediction:', error);
+      const currentPrice = features.arraySync()[0][0];
+      return {
+        price: {
+          low: currentPrice * 0.95,
+          high: currentPrice * 1.05
+        },
+        confidence: 50,
+        signals: ['Using fallback prediction due to error']
+      };
+    }
   }
 
   private calculateConfidence(indicators: number[]): number {
@@ -535,7 +620,7 @@ class AdvancedAnalysisService {
   private async calculateTechnicalSignals(priceData: any, volumeData: any): Promise<TechnicalSignals> {
     try {
       // Additional validation
-      if (!Array.isArray(priceData.prices) || priceData.prices.length < 20) {
+      if (!Array.isArray(priceData.prices) || priceData.prices.length < 200) {
         console.error('Invalid price data:', priceData);
         throw new Error('Insufficient price data');
       }
@@ -552,28 +637,37 @@ class AdvancedAnalysisService {
       console.log('Technical Signals Input:', {
         pricesLength: prices.length,
         volumesLength: volumes.length,
-        samplePrices: prices.slice(-5),
-        sampleVolumes: volumes.slice(-5)
+        samplePrices: prices.slice(-20), // Show last 20 points for debugging
+        sampleVolumes: volumes.slice(-20)
       });
 
-      // Calculate indicators with validated data
-      const rsi = this.calculateRSI(prices);
+      // Calculate indicators using full dataset
+      const rsi = this.calculateRSI(prices, 14); // 14-period RSI using all available data
       const macd = {
-        value: this.calculateMACD(prices),
+        value: this.calculateMACD(prices), // Using full dataset for EMA calculations
         signal: this.calculateMACDSignal(prices),
         histogram: this.calculateMACDHistogram(prices)
       };
-      const stochRSI = this.calculateStochRSI(prices);
-      const volumeChange = volumes.length > 0 ? this.calculateVolumeRatio(volumes) : 1;
-      const volatility = this.calculateVolatility(prices);
+      const stochRSI = this.calculateStochRSI(prices, 14);
+      
+      // Calculate volume metrics using more data
+      const volumeChange = volumes.length > 0 ? 
+        this.calculateVolumeRatio(volumes.slice(-100)) : 1; // Use last 100 periods for volume ratio
+      
+      // Calculate volatility using more data
+      const volatility = this.calculateVolatility(prices.slice(-100)); // 100-period volatility
 
-      // Calculate trends
+      // Calculate trends using full dataset
       const primaryTrend = this.determineTrendDirection(prices);
       const secondaryTrend = this.determineSecondaryTrend(prices);
-      const volumeProfile = this.calculateVolumeProfile(prices, volumes);
+      const volumeProfile = this.calculateVolumeProfile(
+        prices.slice(-200), // Use last 200 periods for volume profile
+        volumes.slice(-200)
+      );
       const trendStrength = volumeProfile.strength || 0.5;
 
       console.log('Technical Calculations:', {
+        dataPointsUsed: prices.length,
         currentPrice: prices[prices.length - 1],
         rsi,
         macd,
@@ -605,19 +699,19 @@ class AdvancedAnalysisService {
         },
         volatility: {
           current: Number(volatility.toFixed(2)),
-          trend: this.determineVolatilityTrend(prices) || 'stable',
+          trend: this.determineVolatilityTrend(prices.slice(-100)), // 100-period volatility trend
           risk: this.categorizeVolatilityRisk(volatility)
         },
         volume: {
           change: Number(volumeChange.toFixed(2)),
-          trend: this.determineVolumeTrend(volumes) || 'neutral',
+          trend: this.determineVolumeTrend(volumes.slice(-100)), // 100-period volume trend
           significance: volumeProfile.strength > 0.7 ? 'strong' :
                        volumeProfile.strength > 0.4 ? 'moderate' : 'weak'
         }
       };
     } catch (error) {
       console.error('Error calculating technical signals:', error);
-      throw error; // Let the parent handle the error
+      throw error;
     }
   }
 
@@ -865,8 +959,10 @@ class AdvancedAnalysisService {
   }
 
   private determineVolatilityTrend(prices: number[]): string {
-    const currentVol = this.calculateVolatility(prices.slice(-20));
-    const previousVol = this.calculateVolatility(prices.slice(-40, -20));
+    if (!prices || prices.length < 100) return 'stable';
+    
+    const currentVol = this.calculateVolatility(prices.slice(-50));
+    const previousVol = this.calculateVolatility(prices.slice(-100, -50));
     
     if (currentVol > previousVol * 1.2) return 'increasing';
     if (currentVol < previousVol * 0.8) return 'decreasing';
@@ -1243,10 +1339,10 @@ class AdvancedAnalysisService {
   }
 
   private determineVolumeTrend(volumes: number[]): string {
-    if (!volumes || volumes.length < 10) return 'neutral';
+    if (!volumes || volumes.length < 100) return 'neutral';
     
-    const recentAvg = volumes.slice(-5).reduce((a, b) => a + b, 0) / 5;
-    const previousAvg = volumes.slice(-10, -5).reduce((a, b) => a + b, 0) / 5;
+    const recentAvg = volumes.slice(-50).reduce((a, b) => a + b, 0) / 50;
+    const previousAvg = volumes.slice(-100, -50).reduce((a, b) => a + b, 0) / 50;
     
     if (recentAvg > previousAvg * 1.1) return 'increasing';
     if (recentAvg < previousAvg * 0.9) return 'decreasing';
@@ -1271,6 +1367,31 @@ class AdvancedAnalysisService {
         signals: ['Default prediction']
       }
     };
+  }
+
+  // Add this method to the AdvancedAnalysisService class
+
+  private calculateSMA(prices: number[], period: number = 20): number[] {
+    try {
+      if (!prices || prices.length === 0) return [0];
+      
+      const sma: number[] = [];
+      for (let i = 0; i < prices.length; i++) {
+        if (i < period - 1) {
+          sma.push(0);
+          continue;
+        }
+        
+        const slice = prices.slice(i - period + 1, i + 1);
+        const average = slice.reduce((sum, price) => sum + price, 0) / period;
+        sma.push(average);
+      }
+      
+      return sma;
+    } catch (error) {
+      console.error('Error calculating SMA:', error);
+      return [0];
+    }
   }
 }
 

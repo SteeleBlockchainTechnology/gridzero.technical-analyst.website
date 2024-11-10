@@ -1,150 +1,6 @@
 import { TradingStrategy } from '../types';
 
-export class StrategyGenerator {
-  calculateEntryPoints(analysis: any) {
-    const { support, resistance, currentPrice } = analysis;
-    const range = resistance - support;
-    
-    return {
-      conservative: support + range * 0.236,
-      moderate: support + range * 0.382,
-      aggressive: support + range * 0.5
-    };
-  }
-
-  calculateStopLosses(analysis: any) {
-    const { support, volatility } = analysis;
-    const volMultiplier = Math.max(0.5, Math.min(2, volatility / 50));
-    
-    return {
-      tight: support * (1 - 0.02 * volMultiplier),
-      normal: support * (1 - 0.05 * volMultiplier),
-      wide: support * (1 - 0.08 * volMultiplier)
-    };
-  }
-
-  calculateTargets(analysis: any) {
-    const { resistance, currentPrice } = analysis;
-    const upside = resistance - currentPrice;
-    
-    return {
-      primary: currentPrice + upside * 0.618,
-      secondary: resistance,
-      final: resistance * 1.236
-    };
-  }
-
-  recommendTimeframe(analysis: any): string {
-    if (!analysis?.volatility || !analysis?.trend) {
-      return 'Medium-term'; // Default timeframe if data is missing
-    }
-    
-    const { volatility, trend } = analysis;
-    
-    if (volatility > 70) return 'Short-term';
-    if (trend.strength > 0.7) return 'Long-term';
-    return 'Medium-term';
-  }
-
-  generateRecommendation(analysis: any): string {
-    const { 
-      marketPhase,
-      technicalSignals,
-      sentiment,
-      riskScore
-    } = analysis;
-
-    if (riskScore > 70) return 'Wait for lower risk';
-    
-    const bullishConditions = [
-      marketPhase === 'accumulation',
-      technicalSignals?.trend === 'bullish',
-      sentiment?.overall?.score > 60
-    ].filter(Boolean).length;
-
-    const bearishConditions = [
-      marketPhase === 'distribution',
-      technicalSignals?.trend === 'bearish',
-      sentiment?.overall?.score < 40
-    ].filter(Boolean).length;
-
-    if (bullishConditions >= 2) return 'Strong Buy';
-    if (bearishConditions >= 2) return 'Strong Sell';
-    if (bullishConditions > bearishConditions) return 'Buy';
-    if (bearishConditions > bullishConditions) return 'Sell';
-    return 'Hold';
-  }
-
-  calculateStrategyConfidence(analysis: any): number {
-    if (!analysis) return 50;
-
-    const factors = [
-      { value: analysis.marketPhase?.confidence || 50, weight: 0.3 },
-      { value: analysis.technicalSignals?.trend?.strength * 100 || 50, weight: 0.3 },
-      { value: analysis.sentiment?.overall?.confidence || 50, weight: 0.2 },
-      { value: analysis.predictions?.shortTerm?.confidence || 50, weight: 0.2 }
-    ];
-
-    const totalWeight = factors.reduce((sum, f) => sum + f.weight, 0);
-    const weightedSum = factors.reduce((sum, f) => sum + f.value * f.weight, 0);
-    
-    return Math.round(weightedSum / totalWeight);
-  }
-
-  generateStrategyRationale(analysis: any): string[] {
-    const rationale = [];
-    
-    if (!analysis) {
-      return ['Market analysis in progress'];
-    }
-
-    const { marketPhase, technicalSignals, sentiment } = analysis;
-
-    if (marketPhase?.phase && marketPhase?.strength) {
-      rationale.push(
-        `Market is in ${marketPhase.phase} phase with ${
-          typeof marketPhase.strength === 'number' 
-            ? marketPhase.strength.toFixed(1) 
-            : '0'
-        }% strength`
-      );
-    }
-
-    if (technicalSignals?.trend?.strength > 0.7 && technicalSignals?.trend?.primary) {
-      rationale.push(`Strong ${technicalSignals.trend.primary} trend detected`);
-    }
-
-    if (technicalSignals?.momentum) {
-      Object.entries(technicalSignals.momentum).forEach(([indicator, data]: [string, any]) => {
-        if (data?.signal && data.signal !== 'neutral') {
-          rationale.push(`${indicator.toUpperCase()}: ${data.signal}`);
-        }
-      });
-    }
-
-    if (technicalSignals?.volume?.significance && technicalSignals?.volume?.trend) {
-      if (technicalSignals.volume.significance !== 'weak') {
-        rationale.push(
-          `${technicalSignals.volume.significance} volume trend: ${technicalSignals.volume.trend}`
-        );
-      }
-    }
-
-    if (sentiment?.overall?.confidence && sentiment?.overall?.signal) {
-      if (sentiment.overall.confidence > 70) {
-        rationale.push(
-          `Strong ${sentiment.overall.signal} sentiment with ${sentiment.overall.confidence}% confidence`
-        );
-      }
-    }
-
-    if (rationale.length === 0) {
-      rationale.push('Analyzing market conditions');
-    }
-
-    return rationale;
-  }
-
+export const strategyGenerator = {
   async generateStrategy(data: {
     currentPrice: number;
     marketCondition: any;
@@ -152,63 +8,162 @@ export class StrategyGenerator {
     sentimentAnalysis: any;
     riskAnalysis: any;
     predictions: any;
-  }) {
-    const { currentPrice, marketCondition, technicalSignals, sentimentAnalysis, riskAnalysis } = data;
+  }): Promise<TradingStrategy> {
+    try {
+      const { currentPrice, marketCondition, technicalSignals } = data;
 
-    // Calculate entry points
-    const entries = this.calculateEntryPoints({
-      support: marketCondition.keyLevels.support,
-      resistance: marketCondition.keyLevels.resistance,
-      currentPrice
-    });
+      // Ensure currentPrice is valid
+      if (!currentPrice || isNaN(currentPrice)) {
+        throw new Error('Invalid current price');
+      }
 
-    // Calculate stop losses
-    const stopLoss = this.calculateStopLosses({
-      support: marketCondition.keyLevels.support,
-      volatility: technicalSignals.volatility.current
-    });
+      // Calculate entries
+      const conservative = this.calculateConservativeEntry(currentPrice, technicalSignals, marketCondition);
+      const aggressive = this.calculateAggressiveEntry(currentPrice, technicalSignals, marketCondition);
 
-    // Calculate targets
-    const targets = this.calculateTargets({
-      resistance: marketCondition.keyLevels.resistance,
-      currentPrice
-    });
+      const entries = {
+        conservative: Number(conservative.toFixed(2)),
+        moderate: Number(currentPrice.toFixed(2)),
+        aggressive: Number(aggressive.toFixed(2))
+      };
 
-    // Generate recommendation
-    const recommendation = this.generateRecommendation({
-      technicalSignals,
-      sentimentAnalysis,
-      marketCondition
-    });
+      // Validate entries
+      if (isNaN(entries.aggressive) || entries.aggressive === 0) {
+        entries.aggressive = Number((currentPrice * 1.02).toFixed(2)); // Default to 2% above current price
+      }
 
-    // Calculate confidence
-    const confidence = this.calculateStrategyConfidence({
-      marketPhase: marketCondition,
-      technicalSignals,
-      sentiment: sentimentAnalysis,
-      predictions: data.predictions
-    });
+      // Determine base recommendation
+      const recommendation = this.determineRecommendation(technicalSignals, marketCondition);
+      const confidence = this.calculateConfidence(technicalSignals, marketCondition);
 
-    // Generate rationale by passing a combined analysis object
-    const rationale = this.generateStrategyRationale({
-      technicalSignals,
-      sentimentAnalysis,
-      marketCondition
-    });
+      const stopLoss = {
+        tight: Number((currentPrice * 0.98).toFixed(2)),    // 2% below entry
+        normal: Number((currentPrice * 0.97).toFixed(2)),   // 3% below entry
+        wide: Number((currentPrice * 0.95).toFixed(2))      // 5% below entry
+      };
 
+      const targets = {
+        primary: Number((currentPrice * 1.03).toFixed(2)),    // 3% above entry
+        secondary: Number((currentPrice * 1.05).toFixed(2)),  // 5% above entry
+        final: Number((currentPrice * 1.08).toFixed(2))       // 8% above entry
+      };
+
+      const rationale = this.generateRationale(technicalSignals, marketCondition);
+
+      return {
+        recommendation: `${recommendation} (${confidence}%)`,
+        confidence,
+        entries,
+        stopLoss,
+        targets,
+        timeframe: this.determineTimeframe(technicalSignals, marketCondition),
+        rationale
+      };
+    } catch (error) {
+      console.error('Error generating strategy:', error);
+      return this.getDefaultStrategy();
+    }
+  },
+
+  determineRecommendation(technicalSignals: any, marketCondition: any): string {
+    const { rsi, macd } = technicalSignals.momentum;
+    const trend = technicalSignals.trend.primary;
+
+    if (rsi.value > 70 && trend === 'bullish') return 'Take Profit';
+    if (rsi.value < 30 && trend === 'bearish') return 'Buy';
+    if (rsi.value > 60 && macd.signal.includes('bullish')) return 'Hold Long';
+    if (rsi.value < 40 && macd.signal.includes('bearish')) return 'Hold Short';
+    return 'Hold';
+  },
+
+  calculateConfidence(technicalSignals: any, marketCondition: any): number {
+    const trendStrength = technicalSignals.trend.strength * 100;
+    const marketStrength = marketCondition.strength * 100;
+    const momentumStrength = 
+      (technicalSignals.momentum.rsi.value > 50 ? 60 : 40) +
+      (technicalSignals.momentum.macd.value > 0 ? 10 : -10);
+
+    return Math.min(95, Math.max(30,
+      (trendStrength * 0.4 + marketStrength * 0.3 + momentumStrength * 0.3)
+    ));
+  },
+
+  calculateConservativeEntry(currentPrice: number, technicalSignals: any, marketCondition: any): number {
+    const support = marketCondition.keyLevels.support;
+    const volatility = technicalSignals.volatility.current / 100;
+    
+    // Conservative entry near support level
+    return Math.max(
+      support,
+      currentPrice * (1 - Math.min(0.05, volatility)) // Max 5% below current price
+    );
+  },
+
+  calculateAggressiveEntry(currentPrice: number, technicalSignals: any, marketCondition: any): number {
+    const resistance = marketCondition.keyLevels.resistance;
+    const volatility = technicalSignals.volatility.current / 100;
+    
+    // Aggressive entry should be between current price and resistance
+    const entryPoint = currentPrice * (1 + Math.min(0.03, volatility)); // Max 3% above current price
+    
+    // Ensure entry doesn't exceed resistance
+    return Math.min(
+      entryPoint,
+      resistance
+    );
+  },
+
+  calculateStopLoss(price: number, percentage: number): number {
+    return price * (1 - percentage);
+  },
+
+  calculateTarget(price: number, percentage: number): number {
+    return price * (1 + percentage);
+  },
+
+  determineTimeframe(technicalSignals: any, marketCondition: any): string {
+    const volatility = technicalSignals.volatility.current;
+    if (volatility > 50) return 'Short-term';
+    if (volatility < 20) return 'Long-term';
+    return 'Medium-term';
+  },
+
+  generateRationale(technicalSignals: any, marketCondition: any): string[] {
+    const rationale = [];
+    
+    rationale.push(`RSI: ${technicalSignals.momentum.rsi.signal}`);
+    rationale.push(`MACD: ${technicalSignals.momentum.macd.signal}`);
+    rationale.push(`STOCHRSI: ${technicalSignals.momentum.stochRSI.signal}`);
+
+    if (marketCondition.strength > 0.6) {
+      rationale.push(`Strong ${marketCondition.phase} phase`);
+    }
+
+    return rationale;
+  },
+
+  getDefaultStrategy(): TradingStrategy {
+    const defaultPrice = 76000;
     return {
-      recommendation,
-      confidence,
-      entries,
-      stopLoss,
-      targets,
-      timeframe: this.recommendTimeframe({
-        volatility: technicalSignals.volatility,
-        trend: technicalSignals.trend
-      }),
-      rationale
+      recommendation: 'Hold (50%)',
+      confidence: 50,
+      entries: {
+        conservative: defaultPrice * 0.98,
+        moderate: defaultPrice,
+        aggressive: defaultPrice * 1.02
+      },
+      stopLoss: {
+        tight: defaultPrice * 0.95,
+        normal: defaultPrice * 0.97,
+        wide: defaultPrice * 0.93
+      },
+      targets: {
+        primary: defaultPrice * 1.03,
+        secondary: defaultPrice * 1.05,
+        final: defaultPrice * 1.08
+      },
+      timeframe: 'Medium-term',
+      rationale: ['Using default strategy due to insufficient data']
     };
   }
-}
-
-export const strategyGenerator = new StrategyGenerator(); 
+};
