@@ -11,7 +11,7 @@ declare global {
 export interface TradingViewProps {
   crypto: string;
   timeframe: string;
-  price: CryptoPrice | null;
+  price: CryptoPrice;
 }
 
 export const TradingView: React.FC<TradingViewProps> = ({ crypto, timeframe, price }) => {

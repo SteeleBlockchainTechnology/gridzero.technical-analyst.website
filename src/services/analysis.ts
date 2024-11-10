@@ -51,18 +51,18 @@ interface DetailedAnalysis {
     socialScore: number;
     marketMood: string;
   };
-  marketStructure: {
-    trend: string;
-    support: number;
-    resistance: number;
-    breakoutPotential: string;
-  };
   aiPrediction: {
     shortTerm: string;
     midTerm: string;
     longTerm: string;
     confidence: number;
     reasoning: string[];
+  };
+  marketStructure: {
+    trend: string;
+    support: number;
+    resistance: number;
+    breakoutPotential: string;
   };
   priceTargets: {
     '24H': {
@@ -144,9 +144,16 @@ class AnalysisService {
       console.log('Historical data response:', response.data);
       
       if (response.data && Array.isArray(response.data.prices)) {
+        const sortedPrices = response.data.prices.sort((a: any, b: any) => 
+          new Date(a.date).getTime() - new Date(b.date).getTime()
+        );
+        const sortedVolumes = response.data.total_volumes.sort((a: any, b: any) => 
+          new Date(a.date).getTime() - new Date(b.date).getTime()
+        );
+        
         return {
-          prices: response.data.prices.map((item: any) => item.price),
-          volumes: response.data.total_volumes.map((item: any) => item.value),
+          prices: sortedPrices.map((item: any) => item.price),
+          volumes: sortedVolumes.map((item: any) => item.value),
           current_price: response.data.current_price,
           market_cap: response.data.market_cap,
           price_change_24h: response.data.price_change_24h
@@ -245,8 +252,10 @@ class AnalysisService {
     return ema;
   }
 
-  private calculateSMA(prices: number[], period: number): number {
-    return prices.slice(-period).reduce((a, b) => a + b, 0) / period;
+  private calculateSMA(prices: number[], period: number = 20): number {
+    if (!prices || prices.length === 0) return 0;
+    const slice = prices.slice(-period);
+    return slice.reduce((sum, price) => sum + price, 0) / slice.length;
   }
 
   private findSupportResistance(prices: number[]) {
@@ -353,22 +362,15 @@ class AnalysisService {
     }
   }
 
-  private calculateVolatilityIndex(prices: number[], period: number = 20): number {
-    const returns = [];
-    for (let i = 1; i < prices.length; i++) {
-      const returnValue = Math.log(prices[i] / prices[i - 1]);
-      returns.push(returnValue);
-    }
-
-    const recentReturns = returns.slice(-period);
-    const stdDev = Math.sqrt(
-      recentReturns.reduce((sum, ret) => sum + Math.pow(ret, 2), 0) / period
+  private calculateVolatility(prices: number[], period: number = 20): number {
+    const returns = prices.slice(1).map((price, i) => 
+      Math.log(price / prices[i])
     );
-
-    return stdDev * Math.sqrt(365) * 100; // Annualized volatility
+    
+    return Math.sqrt(
+      returns.reduce((sum, ret) => sum + Math.pow(ret, 2), 0) / returns.length
+    ) * Math.sqrt(365) * 100;
   }
-
-
 
 
 
@@ -398,26 +400,15 @@ class AnalysisService {
 
       SENTIMENT:
       • News Sentiment: ${sentiment.newsScore}% positive
-      • Market Mood: ${sentiment.marketMood}
+       Market Mood: ${sentiment.marketMood}
       • News: ${JSON.stringify(news)}
 
-      Format your response in this exact HTML structure:
+      Format your response in this exact HTML structure and make sure they are higly concise and accurate. Use all the information above and be very analytical and act like a professional trader. Once You have information precisely format them in the following struture precisely following what each section is asking. Do not make up any information use the information to make a very accurate information:
 
       <div class="analysis">
         <div class="summary">
           <h3>Executive Summary</h3>
           <p class="highlight">[2-line market summary]</p>
-        </div>
-
-        <div class="predictions">
-          <h3>Price Targets</h3>
-          <div class="prediction short">
-            <span class="timeframe">24H:</span>
-            <span class="price">[range]</span>
-            <span class="confidence">[High/Medium/Low]</span>
-            <span class="reason">[one-line reason]</span>
-          </div>
-          [Similar divs for 7D and 30D predictions]
         </div>
 
         <div class="signals">
@@ -429,12 +420,7 @@ class AnalysisService {
           </ul>
         </div>
 
-        <div class="strategy">
-          <h3>Trading Strategy</h3>
-          <div class="position [long/short/neutral]">
-            <span class="label">Position:</span>
-            <span class="value">[Long/Short/Neutral]</span>
-          </div>
+       
           <div class="levels">
             <div class="entry">Entry: $[price]</div>
             <div class="stop">Stop Loss: $[price]</div>
@@ -521,6 +507,65 @@ class AnalysisService {
     return Math.min(95, Math.max(30, weightedConfidence));
   }
 
+  private async generatePredictions(
+    prices: number[],
+    currentPrice: number,
+    volatility: number,
+    marketPhase: string,
+    signals: any[],
+    obvTrend: string,
+    stochRSI: number
+  ) {
+    // Calculate support and resistance levels first
+    const { support, resistance } = this.findSupportResistance(prices);
+
+    // Calculate price targets
+    const priceTargets = this.calculatePriceTargets(
+      currentPrice,
+      prices,
+      volatility,
+      support,
+      resistance
+    );
+
+    // Calculate confidence levels
+    const shortTermConfidence = parseFloat((85 - volatility / 2).toFixed(2));
+    const midTermConfidence = Math.max(30, shortTermConfidence * 0.9);
+    const longTermConfidence = Math.max(30, shortTermConfidence * 0.8);
+
+    // Generate reasoning array
+    const reasoning = [
+      `Market is in ${marketPhase} phase`,
+      ...signals.map(s => `${s.indicator}: ${s.signal}`),
+      `Volume trend: ${obvTrend}`,
+      `StochRSI indicates ${this.interpretStochRSI(stochRSI)}`
+    ];
+
+    return {
+      aiPrediction: {
+        shortTerm: `$${priceTargets.shortTerm.low.toFixed(2)} - $${priceTargets.shortTerm.high.toFixed(2)}`,
+        midTerm: `$${priceTargets.midTerm.low.toFixed(2)} - $${priceTargets.midTerm.high.toFixed(2)}`,
+        longTerm: `$${priceTargets.longTerm.low.toFixed(2)} - $${priceTargets.longTerm.high.toFixed(2)}`,
+        confidence: shortTermConfidence,
+        reasoning
+      },
+      priceTargets: {
+        '24H': {
+          range: `$${priceTargets.shortTerm.low.toFixed(2)} - $${priceTargets.shortTerm.high.toFixed(2)}`,
+          confidence: shortTermConfidence.toString()
+        },
+        '7D': {
+          range: `$${priceTargets.midTerm.low.toFixed(2)} - $${priceTargets.midTerm.high.toFixed(2)}`,
+          confidence: midTermConfidence.toString()
+        },
+        '30D': {
+          range: `$${priceTargets.longTerm.low.toFixed(2)} - $${priceTargets.longTerm.high.toFixed(2)}`,
+          confidence: longTermConfidence.toString()
+        }
+      }
+    };
+  }
+
   async getDetailedAnalysis(crypto: string): Promise<DetailedAnalysis> {
     try {
       const historicalData = await this.getHistoricalData(crypto);
@@ -536,26 +581,65 @@ class AnalysisService {
       const ma200 = this.calculateSMA(prices, 200);
       const { support, resistance } = this.findSupportResistance(prices);
       const volumeRatio = this.calculateVolumeRatio(volumes);
-      const volatilityIndex = this.calculateVolatilityIndex(prices);
+      const volatilityIndex = this.calculateVolatility(prices);
       const stochRSI = this.calculateStochRSI(prices);
       const obvTrend = this.calculateOBV(prices, volumes);
       const marketPhase = this.determineMarketPhase(prices, ma50, ma200);
 
-      // Generate market summary based on indicators
-      const marketSummary = `${crypto.charAt(0).toUpperCase() + crypto.slice(1)} is currently in a ${marketPhase}, trading at $${currentPrice.toFixed(2)}. RSI at ${rsi.toFixed(2)} ${this.interpretRSI(rsi)}, with ${macd.interpretation}. Volume trend is ${obvTrend} with ${volumeRatio.toFixed(2)}x average volume.`;
+      // Updated market summary with date-based formatting and current trend lines
+      const latestDateIndex = prices.length - 1;
+      const latestPrice = prices[latestDateIndex];
+      const latestVolume = volumes[latestDateIndex];
+      const marketSummary = `${crypto.charAt(0).toUpperCase() + crypto.slice(1)} as of ${new Date().toLocaleDateString()} is in a ${marketPhase} phase, trading at $${latestPrice.toFixed(2)}. RSI is ${rsi.toFixed(2)} (${this.interpretRSI(rsi)}), with MACD indicating ${macd.interpretation}. The volume trend is ${obvTrend} with a ${volumeRatio.toFixed(2)}x change compared to the average volume.`;
 
       // Get market sentiment and news
       const sentiment = await this.getMarketSentiment(crypto);
       const newsResponse = await api.getNews(crypto);
       const newsItems = newsResponse.news; // Extract the news array
 
-      // Calculate price targets using historical data and indicators
-      const priceTargets = this.calculatePriceTargets(
-        currentPrice,
+      // Generate signals based on all indicators
+      const signals = [
+        {
+          indicator: 'RSI',
+          value: rsi,
+          signal: this.interpretRSI(rsi),
+          strength: rsi > 70 || rsi < 30 ? 0.8 : 0.5
+        },
+        {
+          indicator: 'MACD',
+          value: macd.value,
+          signal: macd.interpretation,
+          strength: Math.abs(macd.histogram) > 0.1 ? 0.8 : 0.5
+        },
+        {
+          indicator: 'StochRSI',
+          value: stochRSI,
+          signal: this.interpretStochRSI(stochRSI),
+          strength: stochRSI > 80 || stochRSI < 20 ? 0.8 : 0.5
+        },
+        {
+          indicator: 'OBV',
+          value: 0,
+          signal: obvTrend,
+          strength: 0.5
+        },
+        {
+          indicator: 'Market Phase',
+          value: 0,
+          signal: marketPhase,
+          strength: 0.7
+        }
+      ];
+
+      // Calculate predictions
+      const predictions = await this.generatePredictions(
         prices,
+        currentPrice,
         volatilityIndex,
-        support,
-        resistance
+        marketPhase,
+        signals,
+        obvTrend,
+        stochRSI
       );
 
       // Generate AI analysis
@@ -583,41 +667,29 @@ class AnalysisService {
       // Parse AI analysis
       const parsedAnalysis = this.parseAIAnalysis(aiAnalysis);
 
-      // Generate signals based on all indicators
-      const signals = [
-        {
-          text: `RSI (${rsi.toFixed(2)}) ${this.interpretRSI(rsi)}`,
-          importance: 'high'
-        },
-        {
-          text: `StochRSI (${stochRSI.toFixed(2)}) ${this.interpretStochRSI(stochRSI)}`,
-          importance: 'high'
-        },
-        {
-          text: `MACD ${macd.interpretation}`,
-          importance: 'high'
-        },
-        {
-          text: `OBV Trend: ${obvTrend}`,
-          importance: 'medium'
-        },
-        {
-          text: `Market Phase: ${marketPhase}`,
-          importance: 'high'
-        }
-      ];
-
-      // Extract predictions from AI analysis
-      const predictions = {
-        shortTerm: this.extractPredictionFromRange(parsedAnalysis.predictions.shortTerm),
-        midTerm: this.extractPredictionFromRange(parsedAnalysis.predictions.midTerm),
-        longTerm: this.extractPredictionFromRange(parsedAnalysis.predictions.longTerm)
-      };
+   
 
       // Calculate confidence for each timeframe
       const shortTermConfidence = this.calculateConfidence(rsi, macd, volumeRatio, sentiment, volatilityIndex);
       const midTermConfidence = Math.max(30, shortTermConfidence * 0.9); // Slightly lower confidence for mid-term
       const longTermConfidence = Math.max(30, shortTermConfidence * 0.8); // Even lower for long-term
+      const volatility = this.calculateVolatility(prices);
+
+      // Calculate price targets
+      const priceTargets = {
+        shortTerm: {
+          low: currentPrice * (1 - volatility * 0.1),
+          high: currentPrice * (1 + volatility * 0.1)
+        },
+        midTerm: {
+          low: currentPrice * (1 - volatility * 0.2),
+          high: currentPrice * (1 + volatility * 0.2)
+        },
+        longTerm: {
+          low: currentPrice * (1 - volatility * 0.3),
+          high: currentPrice * (1 + volatility * 0.3)
+        }
+      };
 
       return {
         summary: parsedAnalysis.summary[0] || marketSummary,
@@ -630,7 +702,9 @@ class AnalysisService {
             interpretation: macd.interpretation
           },
           movingAverages: {
-            ma20, ma50, ma200,
+            ma20: this.calculateSMA(prices, 20),
+            ma50: this.calculateSMA(prices, 50),
+            ma200: this.calculateSMA(prices, 200),
             interpretation: marketPhase
           },
           volume: {
@@ -646,6 +720,19 @@ class AnalysisService {
           socialScore: parseFloat(sentiment.socialScore.toFixed(2)),
           marketMood: sentiment.marketMood
         },
+        aiPrediction: {
+          shortTerm: predictions.aiPrediction.shortTerm,
+          midTerm: predictions.aiPrediction.midTerm,
+          longTerm: predictions.aiPrediction.longTerm,
+          confidence: parseFloat((85 - volatilityIndex / 2).toFixed(2)),
+          reasoning: [
+            parsedAnalysis.summary[0] || marketSummary,
+            ...signals.map(s => `${s.indicator}: ${s.signal}`),
+            `Volume trend: ${obvTrend}`,
+            `StochRSI indicates ${this.interpretStochRSI(stochRSI)}`,
+            `Market is in ${marketPhase} phase`
+          ]
+        },
         marketStructure: {
           trend: marketPhase,
           support: parseFloat(support.toFixed(2)),
@@ -653,39 +740,29 @@ class AnalysisService {
           breakoutPotential: currentPrice > resistance ? 'Bullish Breakout Potential' :
                             currentPrice < support ? 'Bearish Breakdown Risk' : 'Range Bound'
         },
-        aiPrediction: {
-          shortTerm: predictions.shortTerm,
-          midTerm: predictions.midTerm,
-          longTerm: predictions.longTerm,
-          confidence: parseFloat((85 - volatilityIndex / 2).toFixed(2)),
-          reasoning: [
-            parsedAnalysis.summary[0] || marketSummary,
-            ...signals.map(s => s.text),
-            `Volume trend: ${obvTrend}`,
-            `StochRSI indicates ${this.interpretStochRSI(stochRSI)}`,
-            `Market is in ${marketPhase} phase`
-          ]
-        },
         priceTargets: {
           '24H': {
             range: `$${priceTargets.shortTerm.low.toFixed(2)} - $${priceTargets.shortTerm.high.toFixed(2)}`,
-            confidence: shortTermConfidence.toFixed(2)
+            confidence: shortTermConfidence.toString()
           },
           '7D': {
             range: `$${priceTargets.midTerm.low.toFixed(2)} - $${priceTargets.midTerm.high.toFixed(2)}`,
-            confidence: midTermConfidence.toFixed(2)
+            confidence: midTermConfidence.toString()
           },
           '30D': {
             range: `$${priceTargets.longTerm.low.toFixed(2)} - $${priceTargets.longTerm.high.toFixed(2)}`,
-            confidence: longTermConfidence.toFixed(2)
+            confidence: longTermConfidence.toString()
           }
         },
-        signals,
+        signals: signals.map(s => ({
+          text: `${s.indicator}: ${s.signal}`,
+          importance: s.strength > 0.7 ? 'high' : s.strength > 0.4 ? 'medium' : 'low'
+        })),
         strategy: {
-          position: marketPhase === 'Bull Market' ? 'Long' : marketPhase === 'Bear Market' ? 'Short' : 'Neutral',
-          entry: `$${support + (resistance - support) * 0.382}`,
-          stop: `$${support * 0.95}`,
-          target: `$${resistance}`
+          position: marketPhase === 'Bull Market' ? 'Long' : 'Short',
+          entry: (support + (resistance - support) * 0.382).toString(),
+          stop: (support * 0.95).toString(),
+          target: resistance.toString()
         },
         marketConditions: {
           trend: marketPhase,
@@ -696,7 +773,7 @@ class AnalysisService {
         },
         sentiment: {
           overall: sentiment.marketMood,
-          newsScore: sentiment.newsScore.toFixed(2),
+          newsScore: sentiment.newsScore.toString(),
           recentNews: newsItems.slice(0, 3).map(n => ({
             title: n.title,
             sentiment: n.sentiment
@@ -794,27 +871,7 @@ class AnalysisService {
     return sections;
   }
 
-  private extractPredictionFromRange(line: string): string {
-    // Extract prediction from price range line
-    const lowerLine = line.toLowerCase();
-    
-    if (lowerLine.includes('price range:')) {
-      if (lowerLine.includes('upward') || lowerLine.includes('higher') || lowerLine.includes('increase')) {
-        return 'Bullish';
-      }
-      if (lowerLine.includes('downward') || lowerLine.includes('lower') || lowerLine.includes('decrease')) {
-        return 'Bearish';
-      }
-    }
-    
-    // Check confidence level if available
-    if (lowerLine.includes('confidence:')) {
-      if (lowerLine.includes('high')) return 'Bullish';
-      if (lowerLine.includes('low')) return 'Bearish';
-    }
-
-    return 'Neutral';
-  }
+ 
 
   private calculatePriceTargets(
     currentPrice: number,
@@ -969,6 +1026,237 @@ class AnalysisService {
       midTerm,
       longTerm
     };
+  }
+
+  async getFullAnalysis(crypto: string): Promise<DetailedAnalysis> {
+    try {
+      // Fetch historical data
+      const historicalData = await api.getHistoricalData(crypto);
+      console.log('Fetching historical data for', crypto, '...');
+      console.log('Historical data response:', historicalData);
+
+      const prices = historicalData.prices;
+      const volumes = historicalData.volumes;
+      const currentPrice = historicalData.current_price;
+
+      // Calculate technical indicators
+      const rsi = this.calculateRSI(prices);
+      const macd = this.calculateMACD(prices);
+      const stochRSI = this.calculateStochRSI(prices);
+      const ma50 = this.calculateSMA(prices, 50);
+      const ma200 = this.calculateSMA(prices, 200);
+      const { support, resistance } = this.findSupportResistance(prices);
+      const volumeRatio = this.calculateVolumeRatio(volumes);
+      const volatility = this.calculateVolatility(prices);
+      const obvTrend = this.calculateOBV(prices, volumes);
+      const marketPhase = this.determineMarketPhase(prices, ma50, ma200);
+
+      // Calculate market sentiment
+      const sentiment = await this.getMarketSentiment(crypto);
+      const newsResponse = await api.getNews(crypto);
+      const newsItems = newsResponse.news;
+
+      // Calculate price targets
+      const priceTargets = {
+        shortTerm: {
+          low: currentPrice * (1 - volatility * 0.1),
+          high: currentPrice * (1 + volatility * 0.1)
+        },
+        midTerm: {
+          low: currentPrice * (1 - volatility * 0.2),
+          high: currentPrice * (1 + volatility * 0.2)
+        },
+        longTerm: {
+          low: currentPrice * (1 - volatility * 0.3),
+          high: currentPrice * (1 + volatility * 0.3)
+        }
+      };
+
+           // Generate signals based on all indicators
+      const signals = [
+        {
+          indicator: 'RSI',
+          value: rsi,
+          signal: this.interpretRSI(rsi),
+          strength: Math.abs(50 - rsi) / 50
+        },
+        {
+          indicator: 'MACD',
+          value: macd.value,
+          signal: macd.interpretation,
+          strength: Math.abs(macd.value / currentPrice)
+        },
+        {
+          indicator: 'StochRSI',
+          value: stochRSI,
+          signal: this.interpretStochRSI(stochRSI),
+          strength: Math.abs(50 - stochRSI) / 50
+        },
+        {
+          indicator: 'OBV',
+          value: 0,
+          signal: obvTrend,
+          strength: volumeRatio - 1
+        }
+      ];
+
+      // Calculate predictions
+      const predictions = await this.generatePredictions(
+        prices,
+        currentPrice,
+        volatility,
+        marketPhase,
+        signals,
+        obvTrend,
+        stochRSI
+      );
+
+      // Generate AI analysis
+      const technicalIndicators = {
+        currentPrice,
+        rsi,
+        macd,
+        ma20: this.calculateSMA(prices, 20),
+        ma50,
+        ma200,
+        volumeChange: volumeRatio,
+        marketPhase,
+        volatility: volatility,
+        support,
+        resistance
+      };
+
+      const aiAnalysis = await this.getAIAnalysis(
+        crypto,
+        technicalIndicators,
+        newsItems, // Pass the news array
+        sentiment
+      );
+
+      // Parse AI analysis
+      const parsedAnalysis = this.parseAIAnalysis(aiAnalysis);
+
+ 
+
+      // Updated market summary with date-based formatting and current trend lines
+      const latestDateIndex = prices.length - 1;
+      const latestPrice = prices[latestDateIndex];
+      const latestVolume = volumes[latestDateIndex];
+      const marketSummary = `${crypto.charAt(0).toUpperCase() + crypto.slice(1)} as of ${new Date().toLocaleDateString()} is in a ${marketPhase.toLowerCase()} with ${
+        signals[0].signal.toLowerCase()
+      } momentum and a ${macd.interpretation.toLowerCase()}. Price is ${
+        latestPrice > ma50 ? 'above' : 'below'
+      } most moving averages, indicating ${
+        latestPrice > ma50 && latestPrice > ma200 ? 'bullish momentum' : 'potential trend reversal'
+      }.`;
+
+      console.log('Price Targets Calculation:', {
+        currentPrice,
+        volatility,
+        momentum: signals[0].strength,
+        rsi,
+        macd: macd.value,
+        stochRSI
+      });
+      const baseConfidence = parseFloat((85 - volatility / 2).toFixed(2));
+
+
+      return {
+        summary: marketSummary,
+        technicalAnalysis: {
+          rsi: {
+            value: rsi,
+            interpretation: this.interpretRSI(rsi)
+          },
+          macd: {
+            value: macd.value,
+            signal: macd.signal,
+            histogram: macd.histogram,
+            interpretation: macd.interpretation
+          },
+          movingAverages: {
+            ma20: this.calculateSMA(prices, 20),
+            ma50: this.calculateSMA(prices, 50),
+            ma200: this.calculateSMA(prices, 200),
+            interpretation: marketPhase
+          },
+          volume: {
+            current: volumes[volumes.length - 1],
+            change: volumeRatio,
+            interpretation: obvTrend
+          },
+          volatility: volatility
+        },
+        sentimentAnalysis: {
+          overall: sentiment.marketMood,
+          newsScore: parseFloat(sentiment.newsScore.toFixed(2)),
+          socialScore: parseFloat(sentiment.socialScore.toFixed(2)),
+          marketMood: sentiment.marketMood
+        },
+        aiPrediction: {
+          shortTerm: predictions.aiPrediction.shortTerm,
+          midTerm: predictions.aiPrediction.midTerm,
+          longTerm: predictions.aiPrediction.longTerm,
+          confidence: parseFloat((85 - volatility/ 2).toFixed(2)),
+          reasoning: [
+            marketSummary,
+            ...signals.map(s => `${s.indicator}: ${s.signal}`),
+            `Volume trend: ${obvTrend}`,
+            `StochRSI indicates ${this.interpretStochRSI(stochRSI)}`,
+            `Market is in ${marketPhase} phase`
+          ]
+        },
+        marketStructure: {
+          trend: marketPhase,
+          support,
+          resistance,
+          breakoutPotential: currentPrice > resistance ? 'Bullish Breakout Potential' :
+                            currentPrice < support ? 'Bearish Breakdown Risk' : 'Range Bound'
+        },
+        priceTargets: {
+          '24H': {
+            range: `$${priceTargets.shortTerm.low.toFixed(2)} - $${priceTargets.shortTerm.high.toFixed(2)}`,
+            confidence: baseConfidence.toString()
+          },
+          '7D': {
+            range: `$${priceTargets.midTerm.low.toFixed(2)} - $${priceTargets.midTerm.high.toFixed(2)}`,
+            confidence: Math.max(30, baseConfidence * 0.9).toString()
+          },
+          '30D': {
+            range: `$${priceTargets.longTerm.low.toFixed(2)} - $${priceTargets.longTerm.high.toFixed(2)}`,
+            confidence: Math.max(30, baseConfidence * 0.8).toString()
+          }
+        },
+        signals: signals.map(s => ({
+          text: `${s.indicator}: ${s.signal}`,
+          importance: s.strength > 0.7 ? 'high' : s.strength > 0.4 ? 'medium' : 'low'
+        })),
+        strategy: {
+          position: marketPhase === 'Bull Market' ? 'Long' : 'Short',
+          entry: (support + (resistance - support) * 0.382).toString(),
+          stop: (support * 0.95).toString(),
+          target: resistance.toString()
+        },
+        marketConditions: {
+          trend: marketPhase,
+          support: support.toFixed(2),
+          resistance: resistance.toFixed(2),
+          distanceToResistance: ((resistance - currentPrice) / currentPrice * 100).toFixed(2),
+          distanceToSupport: ((currentPrice - support) / currentPrice * 100).toFixed(2)
+        },
+        sentiment: {
+          overall: sentiment.marketMood,
+          newsScore: sentiment.newsScore.toString(),
+          recentNews: newsItems.slice(0, 3).map(n => ({
+            title: n.title,
+            sentiment: n.sentiment
+          }))
+        }
+      };
+    } catch (error) {
+      console.error('Error in analysis:', error);
+      throw error;
+    }
   }
 }
 

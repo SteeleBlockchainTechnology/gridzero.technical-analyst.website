@@ -40,4 +40,77 @@ export interface Alert {
   message: string;
   severity: 'high' | 'medium' | 'low';
   timestamp: number;
+}
+
+export interface RiskFactors {
+  volatility: number;
+  trend: number;
+  volume: number;
+  news: number;
+  social: number;
+  market: number;
+}
+
+export interface TradingStrategy {
+  recommendation: string;
+  confidence: number;
+  entries: {
+    conservative: number;
+    moderate: number;
+    aggressive: number;
+  };
+  stopLoss: {
+    tight: number;
+    normal: number;
+    wide: number;
+  };
+  targets: {
+    primary: number;
+    secondary: number;
+    final: number;
+  };
+  timeframe: string;
+  rationale: string[];
+}
+
+export interface TechnicalSignals {
+  trend: {
+    primary: string;
+    secondary: string;
+    strength: number;
+  };
+  momentum: {
+    rsi: { value: number; signal: string; };
+    macd: { value: number; signal: string; };
+    stochRSI: { value: number; signal: string; };
+  };
+  volatility: {
+    current: number;
+    trend: string;
+    risk: 'low' | 'medium' | 'high';
+  };
+  volume: {
+    change: number;
+    trend: string;
+    significance: 'weak' | 'moderate' | 'strong';
+  };
+}
+
+interface PredictionResult {
+  price: { low: number; high: number };
+  confidence: number;
+  signals: string[];
+}
+
+interface MarketPhase {
+  phase: string;
+  strength: number;
+  confidence: number;
+  keyLevels: {
+    strongSupport: number;
+    support: number;
+    pivot: number;
+    resistance: number;
+    strongResistance: number;
+  };
 } 

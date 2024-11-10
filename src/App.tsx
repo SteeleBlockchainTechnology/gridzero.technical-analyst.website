@@ -1,217 +1,132 @@
-import { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Layout } from './components/Layout';
-import { TradingView } from './components/TradingView';
-import { PredictionPanel } from './components/PredictionPanel';
-import { SentimentAnalysis } from './components/SentimentAnalysis';
 import { NewsPanel } from './components/NewsPanel';
-import { AlertsPanel } from './components/AlertsPanel';
-import { Bitcoin, ChevronDown } from 'lucide-react';
-import { CryptoPrice, NewsItem, SentimentData, PredictionData } from './services/types';
+import { TradingView } from './components/TradingView';
 import { MarketAnalysis } from './components/MarketAnalysis';
-import { wsService } from './services/websocket';
+import { SentimentAnalysis } from './components/SentimentAnalysis';
+import { AdvancedAnalysis } from './components/AdvancedAnalysis';
 import { api } from './services/api';
+import type { NewsItem, SentimentData, PredictionData, CryptoPrice } from './services/types';
+import { Coins, Clock } from 'lucide-react';
 
 function App() {
-  const [selectedCrypto, setSelectedCrypto] = useState('bitcoin');
-  const [timeframe, setTimeframe] = useState('1D');
-  const [showCryptoDropdown, setShowCryptoDropdown] = useState(false);
-  const timeframes = ['1H', '4H', '1D', '1W', '1M'];
-  const [price, setPrice] = useState<CryptoPrice | null>(null);
+  const [crypto, setCrypto] = useState('bitcoin');
   const [news, setNews] = useState<NewsItem[]>([]);
   const [sentiment, setSentiment] = useState<SentimentData[]>([]);
+  const [price, setPrice] = useState<CryptoPrice>({
+    price: 0,
+    change24h: 0,
+    timestamp: Date.now()
+  });
   const [predictions, setPredictions] = useState<PredictionData[]>([]);
-  const [wsConnected, setWsConnected] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [timeframe, setTimeframe] = useState('1D');
 
-  const cryptoOptions = [
-    { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
-    { id: 'ethereum', symbol: 'ETH', name: 'Ethereum' },
-    { id: 'binancecoin', symbol: 'BNB', name: 'Binance Coin' },
-    { id: 'cardano', symbol: 'ADA', name: 'Cardano' },
-    { id: 'solana', symbol: 'SOL', name: 'Solana' },
+  const timeframes = ['1H', '4H', '1D', '1W', '1M'];
+  const cryptos = [
+    { id: 'bitcoin', symbol: 'BTC' },
+    { id: 'ethereum', symbol: 'ETH' },
+    { id: 'binancecoin', symbol: 'BNB' },
+    { id: 'cardano', symbol: 'ADA' },
+    { id: 'solana', symbol: 'SOL' }
   ];
-
-  const selectedCryptoData = cryptoOptions.find(crypto => crypto.id === selectedCrypto);
 
   useEffect(() => {
     const fetchData = async () => {
-      setLoading(true);
       try {
-        const [newsData, sentimentData] = await Promise.all([
-          api.getNews(selectedCrypto),
-          api.getSentiment(selectedCrypto)
+        const [newsData, sentimentData, priceData, predictionsData] = await Promise.all([
+          api.getNews(crypto),
+          api.getSentiment(crypto),
+          api.getPrice(crypto),
+          api.getPredictions(crypto)
         ]);
 
-        setNews(newsData);
+        setNews(newsData.news);
         setSentiment(sentimentData);
+        setPrice(priceData);
+        setPredictions(predictionsData);
       } catch (error) {
         console.error('Error fetching data:', error);
-      } finally {
-        setLoading(false);
       }
     };
 
     fetchData();
     const interval = setInterval(fetchData, 60000);
+
     return () => clearInterval(interval);
-  }, [selectedCrypto]);
-
-  useEffect(() => {
-    // Connect to WebSocket
-    wsService.connect();
-
-    // Subscribe to price updates
-    const unsubscribe = wsService.subscribe((data) => {
-      const cryptoData = data.find((d: any) => d[selectedCrypto]);
-      if (cryptoData) {
-        setPrice({
-          price: cryptoData[selectedCrypto].usd,
-          change24h: cryptoData[selectedCrypto].usd_24h_change,
-          timestamp: Date.now()
-        });
-        setWsConnected(true);
-      }
-    });
-
-    // Cleanup
-    return () => {
-      unsubscribe();
-      wsService.disconnect();
-    };
-  }, [selectedCrypto]);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = () => setShowCryptoDropdown(false);
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, []);
-
-  // Add connection status indicator
-  const ConnectionStatus = () => (
-    <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
-      wsConnected ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
-    }`}>
-      <div className={`w-2 h-2 rounded-full ${
-        wsConnected ? 'bg-green-400' : 'bg-red-400'
-      }`} />
-      {wsConnected ? 'Live' : 'Connecting...'}
-    </div>
-  );
-
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center h-screen">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
-        </div>
-      </Layout>
-    );
-  }
+  }, [crypto]);
 
   return (
     <Layout>
-      <div className="p-6 text-white">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-3">
-            <Bitcoin className="w-8 h-8 text-yellow-500" />
-            <div>
-              <h1 className="text-2xl font-bold">Crypto Trading Dashboard</h1>
-              <p className="text-slate-400">Real-time analysis and predictions</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <ConnectionStatus />
-            <div className="relative">
-              <button 
-                className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg hover:bg-slate-700"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowCryptoDropdown(!showCryptoDropdown);
-                }}
+      <div className="container mx-auto p-4 text-white">
+        {/* Header - Updated styling */}
+        <div className="flex items-center justify-between mb-6 bg-slate-800/50 p-4 rounded-lg backdrop-blur-sm">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <Coins className="w-6 h-6 text-blue-400" />
+              <select 
+                value={crypto}
+                onChange={(e) => setCrypto(e.target.value)}
+                className="bg-slate-750 border-none rounded-lg text-lg font-semibold focus:ring-2 focus:ring-blue-500 text-white"
               >
-                {selectedCryptoData?.symbol}/USD
-                <ChevronDown className="w-4 h-4" />
-              </button>
-              
-              {showCryptoDropdown && (
-                <div className="absolute top-full mt-2 w-48 bg-slate-800 rounded-lg shadow-lg py-1 z-10">
-                  {cryptoOptions.map((crypto) => (
-                    <button
-                      key={crypto.id}
-                      className="w-full px-4 py-2 text-left hover:bg-slate-700 flex items-center gap-2"
-                      onClick={() => {
-                        setSelectedCrypto(crypto.id);
-                        setShowCryptoDropdown(false);
-                      }}
-                    >
-                      <span className="font-medium">{crypto.symbol}</span>
-                      <span className="text-sm text-slate-400">{crypto.name}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+                {cryptos.map(({ id, symbol }) => (
+                  <option key={id} value={id} className="text-white bg-slate-800">
+                    {symbol}/USD
+                  </option>
+                ))}
+              </select>
             </div>
-            <div className="flex bg-slate-800 rounded-lg p-1">
-              {timeframes.map((tf) => (
-                <button
-                  key={tf}
-                  onClick={() => setTimeframe(tf)}
-                  className={`px-4 py-1 rounded-md transition-colors ${
-                    timeframe === tf
-                      ? 'bg-blue-500 text-white'
-                      : 'text-slate-400 hover:bg-slate-700'
-                  }`}
-                >
-                  {tf}
-                </button>
-              ))}
+            <div className="flex items-center gap-3">
+              <Clock className="w-5 h-5 text-blue-400" />
+              <div className="flex gap-1 bg-slate-800 p-1 rounded-lg">
+                {timeframes.map((tf) => (
+                  <button
+                    key={tf}
+                    onClick={() => setTimeframe(tf)}
+                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                      timeframe === tf 
+                        ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' 
+                        : 'text-slate-400 hover:bg-slate-700 hover:text-white'
+                    }`}
+                  >
+                    {tf}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Main Content */}
+        {/* Main Content - Updated grid layout */}
         <div className="grid grid-cols-12 gap-6">
-          {/* Left Column - Chart */}
+          {/* Left Column - Chart and Analysis */}
           <div className="col-span-8 space-y-6">
-            <div className="bg-slate-800 rounded-xl p-4">
+            <div className="bg-slate-800 rounded-xl overflow-hidden shadow-xl shadow-black/10">
               <TradingView 
-                crypto={selectedCrypto} 
-                timeframe={timeframe} 
+                crypto={crypto} 
+                timeframe={timeframe}
                 price={price}
               />
             </div>
-            
-            {/* Add Market Analysis Component */}
-            <div className="bg-slate-800 rounded-xl p-4">
-              <MarketAnalysis crypto={selectedCrypto} />
+            <div className="bg-slate-800 rounded-xl p-6 shadow-xl shadow-black/10">
+              <MarketAnalysis crypto={crypto} />
+            </div>
+            <div className="bg-slate-800 rounded-xl p-6 shadow-xl shadow-black/10">
+              <AdvancedAnalysis crypto={crypto} />
             </div>
           </div>
 
-          {/* Right Column - Predictions & Alerts */}
+          {/* Right Column - Predictions, Alerts, News */}
           <div className="col-span-4 space-y-6">
-            <div className="bg-slate-800 rounded-xl p-4">
-              <PredictionPanel 
-                crypto={selectedCrypto} 
-                timeframe={timeframe} 
-                predictions={predictions}
-              />
-            </div>
-            <div className="bg-slate-800 rounded-xl p-4">
-              <AlertsPanel crypto={selectedCrypto} />
-            </div>
-            <div className="bg-slate-800 rounded-xl p-4">
+       
+
+            <div className="bg-slate-800 rounded-xl p-6 shadow-xl shadow-black/10">
               <SentimentAnalysis 
-                crypto={selectedCrypto} 
+                crypto={crypto} 
                 sentimentData={sentiment}
               />
             </div>
-            <div className="bg-slate-800 rounded-xl p-4">
-              <NewsPanel 
-                crypto={selectedCrypto} 
-                news={news}
-              />
+            <div className="bg-slate-800 rounded-xl p-6 shadow-xl shadow-black/10 max-h-[600px] overflow-y-auto">
+              <NewsPanel crypto={crypto} news={news} />
             </div>
           </div>
         </div>
