@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Layout } from './components/Layout'
 import { NewsPanel } from './components/NewsPanel'
 import { TradingView } from './components/TradingView'

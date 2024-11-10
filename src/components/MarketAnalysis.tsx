@@ -312,14 +312,7 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto }) => {
         </div>
 
         {/* Additional loading info */}
-        <motion.div
-          className="absolute bottom-4 text-sm text-gray-400 text-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 2.5 }}
-        >
-          Analyzing multiple data sources for accurate predictions...
-        </motion.div>
+      
       </div>
     );
   }

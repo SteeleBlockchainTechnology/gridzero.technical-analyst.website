@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Activity, TrendingUp, TrendingDown } from 'lucide-react'
+import { Activity} from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 

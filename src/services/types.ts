@@ -124,24 +124,6 @@ export interface TechnicalSignals {
   };
 }
 
-interface PredictionResult {
-  price: { low: number; high: number };
-  confidence: number;
-  signals: string[];
-}
-
-interface MarketPhase {
-  phase: string;
-  strength: number;
-  confidence: number;
-  keyLevels: {
-    strongSupport: number;
-    support: number;
-    pivot: number;
-    resistance: number;
-    strongResistance: number;
-  };
-}
 
 export interface DetailedAnalysis {
   summary: string;

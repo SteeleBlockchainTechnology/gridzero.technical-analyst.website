@@ -221,50 +221,7 @@ class AdvancedAnalysisService {
     }
   }
 
-  private determineMarketPhase(prices: number[], volumeData: number[], trendStrength: number): string {
-    try {
-      const currentPrice = prices[prices.length - 1];
-      const ma50 = this.calculateSMA(prices, 50);
-      const ma200 = this.calculateSMA(prices, 200);
-      
-      // Calculate momentum
-      const rsi = this.calculateRSI(prices);
-      const macd = this.calculateMACD(prices);
-      
-      // Determine phase based on multiple factors
-      if (currentPrice > ma50 && ma50 > ma200 && trendStrength > 0.5 && rsi > 50) {
-        return 'bullish';
-      } else if (currentPrice < ma50 && ma50 < ma200 && trendStrength < -0.5 && rsi < 50) {
-        return 'bearish';
-      } else if (currentPrice > ma200 && currentPrice < ma50) {
-        return 'correction';
-      } else if (currentPrice < ma200 && currentPrice > ma50) {
-        return 'recovery';
-      } else if (Math.abs(trendStrength) < 0.3) {
-        return 'sideways';
-      }
-      
-      return 'neutral';
-    } catch (error) {
-      console.error('Error determining market phase:', error);
-      return 'neutral';
-    }
-  }
-
-  private calculatePhaseStrength(phase: string, trendStrength: number, volumeProfile: any): number {
-    switch (phase) {
-      case 'markup':
-        return Math.min(1, trendStrength * 1.2);
-      case 'markdown':
-        return Math.min(1, Math.abs(trendStrength) * 1.2);
-      case 'accumulation':
-        return Math.min(1, volumeProfile.buyingPressure * 1.5);
-      case 'distribution':
-        return Math.min(1, volumeProfile.sellingPressure * 1.5);
-      default:
-        return 0.5;
-    }
-  }
+ 
 
   private async analyzeTrendStrength(prices: number[], volumes: number[]) {
     // Calculate multiple trend indicators
@@ -477,134 +434,6 @@ class AdvancedAnalysisService {
     return await mlModels.getTrendModel();
   }
 
-  private prepareFeatures(data: any) {
-    try {
-      if (!data?.prices?.length) {
-        throw new Error('Invalid price data for feature preparation');
-      }
-
-      // Calculate technical indicators
-      const rsi = this.calculateRSI(data.prices);
-      const macd = this.calculateMACD(data.prices);
-      const volatility = this.calculateVolatility(data.prices);
-      const volumeChange = data.volumes?.length > 0 ? 
-        this.calculateVolumeRatio(data.volumes) : 1;
-
-      // Create feature vector with exactly 4 features
-      const features = [
-        [
-          rsi / 100, // Normalize RSI to 0-1 range
-          macd, // MACD
-          volatility / 100, // Normalize volatility
-          volumeChange // Volume change ratio
-        ]
-      ];
-
-      console.log('Prepared Features:', {
-        shape: [1, 4],
-        features: features[0]
-      });
-      
-      // Return as 2D tensor with shape [1, 4]
-      return tf.tensor2d(features);
-    } catch (error) {
-      console.error('Error preparing features:', error);
-      // Return default feature tensor with correct shape [1, 4]
-      return tf.tensor2d([[
-        0.5,  // default normalized RSI
-        0,    // default MACD
-        0.3,  // default normalized volatility
-        1     // default volume ratio
-      ]]);
-    }
-  }
-
-  private calculateBollingerBands(prices: number[], period: number = 20, multiplier: number = 2) {
-    const smaValues = this.calculateSMA(prices, period);
-    const stdDev = this.calculateStandardDeviation(prices, period);
-    
-    // Get the last SMA value
-    const lastSMA = Array.isArray(smaValues) ? smaValues[smaValues.length - 1] : smaValues;
-    
-    return {
-      upper: lastSMA + (multiplier * stdDev),
-      middle: lastSMA,
-      lower: lastSMA - (multiplier * stdDev)
-    };
-  }
-
-  private calculateATR(prices: number[], period: number = 14): number {
-    const tr = this.calculateTrueRange(prices);
-    return tr.slice(-period).reduce((sum, val) => sum + val, 0) / period;
-  }
-
-  private calculateStandardDeviation(prices: number[], period: number): number {
-    if (!prices || prices.length === 0) return 0;
-    const slice = prices.slice(-period);
-    const mean = slice.reduce((sum, price) => sum + price, 0) / slice.length;
-    const squaredDiffs = slice.map(price => Math.pow(price - mean, 2));
-    const variance = squaredDiffs.reduce((sum, diff) => sum + diff, 0) / slice.length;
-    return Math.sqrt(variance);
-  }
-
-  private async makePrediction(
-    model: tf.LayersModel,
-    features: tf.Tensor2D,
-    timeframe: string
-  ): Promise<{ price: { low: number; high: number }; confidence: number; signals: string[] }> {
-    try {
-      // Verify input shape
-      const shape = features.shape;
-      if (shape[1] !== 4) {
-        throw new Error(`Invalid feature shape: expected [null, 4] but got [${shape[0]}, ${shape[1]}]`);
-      }
-
-      // Make prediction
-      const prediction = await model.predict(features) as tf.Tensor;
-      const [predictedValue] = await prediction.data();
-      
-      // Calculate price range based on timeframe and volatility
-      const baseRange = timeframe === '24h' ? 0.02 : 
-                       timeframe === '7d' ? 0.05 : 0.10;
-      
-      const currentPrice = features.arraySync()[0][0];
-      const predictedChange = (predictedValue - currentPrice) / currentPrice;
-      
-      // Calculate confidence based on model output
-      const confidence = Math.min(95, Math.max(30,
-        (1 - Math.abs(predictedChange)) * 100 * 
-        (timeframe === '24h' ? 1 : timeframe === '7d' ? 0.9 : 0.8)
-      ));
-
-      // Generate price range
-      const low = currentPrice * (1 + predictedChange - baseRange);
-      const high = currentPrice * (1 + predictedChange + baseRange);
-
-      // Clean up tensors
-      prediction.dispose();
-      features.dispose();
-
-      // Generate signals
-      const signals = this.generatePredictionSignals(low, high, baseRange);
-
-      return {
-        price: { low, high },
-        confidence,
-        signals
-      };
-    } catch (error) {
-      console.error('Error making prediction:', error);
-      const currentPrice = features.arraySync()[0][0];
-      return {
-        price: {
-          low: currentPrice * 0.95,
-          high: currentPrice * 1.05
-        },
-        confidence: 50,
-        signals: ['Using fallback prediction due to error']
-      };
-    }
-  }
 
   private calculateConfidence(indicators: number[]): number {
     try {
@@ -1321,11 +1150,9 @@ class AdvancedAnalysisService {
     socialVolume: number,
     newsScore: number
   ): { score: number; trend: string; volume: number } {
-    // Calculate social sentiment based on multiple factors
     const volumeChange = technicalSignals.volume.change;
     const momentum = technicalSignals.momentum;
     
-    // Calculate social score using volume and momentum
     const volumeScore = volumeChange > 1.5 ? 70 : 
                      volumeChange > 1.0 ? 60 : 
                      volumeChange < 0.5 ? 30 : 40;
@@ -1335,14 +1162,17 @@ class AdvancedAnalysisService {
                          momentum.rsi.value < 30 ? 25 :
                          momentum.rsi.value < 40 ? 35 : 50;
     
-    // Combine scores with weights
+    const socialVolumeScore = socialVolume > 70 ? 75 :
+                             socialVolume > 50 ? 65 :
+                             socialVolume < 30 ? 25 : 50;
+    
     const score = (
-      volumeScore * 0.3 +
-      momentumScore * 0.4 +
-      newsScore * 0.3
+      volumeScore * 0.25 +
+      momentumScore * 0.35 +
+      newsScore * 0.25 +
+      socialVolumeScore * 0.15
     );
 
-    // Determine trend
     const trend = score > 60 ? 'bullish' :
                  score < 40 ? 'bearish' : 'neutral';
 
@@ -1354,8 +1184,8 @@ class AdvancedAnalysisService {
   }
 
   private calculateMarketSentiment(technicalSignals: any) {
-    const { rsi, macd, stochRSI } = technicalSignals.momentum;
-    const { primary: trend, strength } = technicalSignals.trend;
+    const { rsi, macd } = technicalSignals.momentum;
+    const { primary: trend } = technicalSignals.trend;
     
     // Calculate market score based on technical indicators
     const rsiScore = rsi.value > 70 ? 75 :
@@ -1457,12 +1287,6 @@ class AdvancedAnalysisService {
     };
   }
 
-  private determineSentimentSignal(sentiment: any): string {
-    const score = sentiment[0]?.volume || 50;
-    if (score > 60) return 'bullish';
-    if (score < 40) return 'bearish';
-    return 'neutral';
-  }
 
   private getDefaultAnalysis(crypto: string): AdvancedAnalysis {
     const defaultPrice = 76000; // Updated default price for Bitcoin
@@ -1500,39 +1324,6 @@ class AdvancedAnalysisService {
         targets: { primary: defaultPrice * 1.05, secondary: defaultPrice * 1.10, final: defaultPrice * 1.15 },
         timeframe: 'Medium-term',
         rationale: ['Using default analysis due to data unavailability']
-      }
-    };
-  }
-
-  private calculatePriceTargets(
-    currentPrice: number,
-    prices: number[],
-    volatility: number,
-    support: number,
-    resistance: number
-  ) {
-    // Calculate Fibonacci levels and use fib236
-    const range = resistance - support;
-    const fib236 = support + (range * 0.236);
-    const fib382 = support + (range * 0.382);
-    const fib618 = support + (range * 0.618);
-
-    // Use fib236 for short-term support
-    const shortTermRange = {
-      low: Math.max(fib236, currentPrice * (1 - volatility * 0.1)),
-      high: Math.min(resistance, currentPrice * (1 + volatility * 0.1))
-    };
-
-    // Rest of the code remains the same...
-    return {
-      shortTerm: shortTermRange,
-      midTerm: {
-        low: Math.min(currentPrice, fib382),
-        high: Math.max(currentPrice, fib618)
-      },
-      longTerm: {
-        low: support,
-        high: resistance
       }
     };
   }

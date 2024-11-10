@@ -1,4 +1,3 @@
-import React from 'react';
 import { useAdvancedAnalysis } from '../hooks/useAdvancedAnalysis';
 import { MarketPhase } from './analysis/MarketPhase';
 import { TechnicalSignals } from './analysis/TechnicalSignals';

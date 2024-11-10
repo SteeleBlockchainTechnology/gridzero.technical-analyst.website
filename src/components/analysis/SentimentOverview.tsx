@@ -1,7 +1,5 @@
 'use client'
-
-import React from 'react'
-import { BarChart2, TrendingUp, TrendingDown, Activity } from 'lucide-react'
+import {Activity } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 

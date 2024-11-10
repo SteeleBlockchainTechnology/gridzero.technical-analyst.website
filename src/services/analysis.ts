@@ -64,13 +64,6 @@ interface ParsedSections {
   reasoning: string[];
 }
 
-interface TimeframeWeights {
-  rsi: number;
-  macd: number;
-  trend: number;
-  volatility: number;
-}
-
 class AnalysisService {
   private async getHistoricalData(crypto: string, days: number = 200) {
     try {
@@ -304,7 +297,7 @@ class AnalysisService {
     }
   }
 
-  private calculateVolatility(prices: number[], period: number = 20): number {
+  private calculateVolatility(prices: number[]): number {
     const returns = prices.slice(1).map((price, i) => 
       Math.log(price / prices[i])
     );
@@ -478,64 +471,6 @@ class AnalysisService {
     return Math.min(95, Math.max(30, weightedConfidence));
   }
 
-  private async generatePredictions(
-    prices: number[],
-    currentPrice: number,
-    volatility: number,
-    marketPhase: string,
-    signals: any[],
-    obvTrend: string,
-    stochRSI: number
-  ) {
-    // Calculate support and resistance levels first
-    const { support, resistance } = this.findSupportResistance(prices);
-
-    // Calculate price targets
-    const priceTargets = this.calculatePriceTargets(
-      currentPrice,
-      prices,
-      volatility,
-      support,
-      resistance
-    );
-
-    // Calculate confidence levels
-    const shortTermConfidence = parseFloat((85 - volatility / 2).toFixed(2));
-    const midTermConfidence = Math.max(30, shortTermConfidence * 0.9);
-    const longTermConfidence = Math.max(30, shortTermConfidence * 0.8);
-
-    // Generate reasoning array
-    const reasoning = [
-      `Market is in ${marketPhase} phase`,
-      ...signals.map(s => `${s.indicator}: ${s.signal}`),
-      `Volume trend: ${obvTrend}`,
-      `StochRSI indicates ${this.interpretStochRSI(stochRSI)}`
-    ];
-
-    return {
-      aiPrediction: {
-        shortTerm: `$${priceTargets.shortTerm.low.toFixed(2)} - $${priceTargets.shortTerm.high.toFixed(2)}`,
-        midTerm: `$${priceTargets.midTerm.low.toFixed(2)} - $${priceTargets.midTerm.high.toFixed(2)}`,
-        longTerm: `$${priceTargets.longTerm.low.toFixed(2)} - $${priceTargets.longTerm.high.toFixed(2)}`,
-        confidence: shortTermConfidence,
-        reasoning
-      },
-      priceTargets: {
-        '24H': {
-          range: `$${priceTargets.shortTerm.low.toFixed(2)} - $${priceTargets.shortTerm.high.toFixed(2)}`,
-          confidence: shortTermConfidence.toString()
-        },
-        '7D': {
-          range: `$${priceTargets.midTerm.low.toFixed(2)} - $${priceTargets.midTerm.high.toFixed(2)}`,
-          confidence: midTermConfidence.toString()
-        },
-        '30D': {
-          range: `$${priceTargets.longTerm.low.toFixed(2)} - $${priceTargets.longTerm.high.toFixed(2)}`,
-          confidence: longTermConfidence.toString()
-        }
-      }
-    };
-  }
 
   async getDetailedAnalysis(crypto: string): Promise<DetailedAnalysis> {
     try {
@@ -586,7 +521,6 @@ class AnalysisService {
       // Updated market summary with date-based formatting and current trend lines
       const latestDateIndex = prices.length - 1;
       const latestPrice = prices[latestDateIndex];
-      const latestVolume = volumes[latestDateIndex];
       const marketSummary = `${crypto.charAt(0).toUpperCase() + crypto.slice(1)} as of ${new Date().toLocaleDateString()} is in a ${marketPhase} phase, trading at $${latestPrice.toFixed(2)}. RSI is ${rsi.toFixed(2)} (${this.interpretRSI(rsi)}), with MACD indicating ${macd.interpretation}. The volume trend is ${obvTrend} with a ${volumeRatio.toFixed(2)}x change compared to the average volume.`;
 
       // Get market sentiment and news
@@ -628,16 +562,7 @@ class AnalysisService {
         }
       ];
 
-      // Calculate predictions
-      const predictions = await this.generatePredictions(
-        prices,
-        currentPrice,
-        volatilityIndex,
-        marketPhase,
-        signals,
-        obvTrend,
-        stochRSI
-      );
+ 
 
       // Generate AI analysis
       const aiAnalysis = await this.getAIAnalysis(
@@ -798,161 +723,6 @@ class AnalysisService {
 
  
 
-  private calculatePriceTargets(
-    currentPrice: number,
-    prices: number[],
-    volatility: number,
-    support: number,
-    resistance: number
-  ) {
-    // Calculate historical volatility
-    const dailyReturns = prices.slice(1).map((price, i) => 
-      Math.log(price / prices[i])
-    );
-    const stdDev = Math.sqrt(
-      dailyReturns.reduce((sum, ret) => sum + Math.pow(ret, 2), 0) / dailyReturns.length
-    );
-    const annualizedVol = stdDev * Math.sqrt(365);
-
-    // Calculate momentum and trend strength
-    const sma20 = this.calculateSMA(prices, 20);
-    const sma50 = this.calculateSMA(prices, 50);
-    const momentum = (sma20 - sma50) / sma50;
-    const rsi = this.calculateRSI(prices);
-    const macd = this.calculateMACD(prices);
-    const trendStrength = Math.abs((currentPrice - sma50) / sma50);
-
-    // Calculate dynamic confidence based on multiple factors
-    const calculateConfidence = (timeframe: string): number => {
-      // Base confidence from technical indicators
-      const rsiConfidence = Math.abs(50 - rsi) / 50; // How far from neutral
-      const macdConfidence = Math.abs(macd.histogram) / Math.abs(macd.signal);
-      const trendConfidence = Math.min(1, trendStrength * 2);
-      
-      // Define timeframe specific weights with proper typing
-      const timeframeWeights: Record<string, TimeframeWeights> = {
-        '24H': {
-          rsi: 0.4,
-          macd: 0.3,
-          trend: 0.2,
-          volatility: 0.1
-        },
-        '7D': {
-          rsi: 0.3,
-          macd: 0.3,
-          trend: 0.3,
-          volatility: 0.1
-        },
-        '30D': {
-          rsi: 0.2,
-          macd: 0.2,
-          trend: 0.4,
-          volatility: 0.2
-        }
-      };
-
-      const weights = timeframeWeights[timeframe];
-      if (!weights) {
-        // Fallback weights if timeframe is not found
-        return 50; // Default confidence
-      }
-
-      // Calculate weighted confidence
-      const baseConfidence = (
-        rsiConfidence * weights.rsi +
-        macdConfidence * weights.macd +
-        trendConfidence * weights.trend +
-        (1 - Math.min(1, annualizedVol / 100)) * weights.volatility
-      ) * 100;
-
-      // Adjust confidence based on market conditions
-      const marketConditions = momentum > 0 ? 1.1 : momentum < 0 ? 0.9 : 1;
-      const volatilityPenalty = Math.max(0, 1 - (annualizedVol / 200));
-      const timeDecay = timeframe === '24H' ? 1 : timeframe === '7D' ? 0.9 : 0.8;
-
-      // Final confidence calculation
-      return Math.min(95, Math.max(30, 
-        baseConfidence * marketConditions * volatilityPenalty * timeDecay
-      ));
-    };
-
-    // Calculate price ranges based on volatility and market structure
-    const ranges = {
-      '24H': {
-        volatilityRange: currentPrice * annualizedVol * 0.1,
-        supportRange: Math.abs(currentPrice - support) * 0.2,
-        resistanceRange: Math.abs(resistance - currentPrice) * 0.2
-      },
-      '7D': {
-        volatilityRange: currentPrice * annualizedVol * 0.2,
-        supportRange: Math.abs(currentPrice - support) * 0.4,
-        resistanceRange: Math.abs(resistance - currentPrice) * 0.4
-      },
-      '30D': {
-        volatilityRange: currentPrice * annualizedVol * 0.3,
-        supportRange: Math.abs(currentPrice - support) * 0.6,
-        resistanceRange: Math.abs(resistance - currentPrice) * 0.6
-      }
-    };
-
-    // Calculate predictions with momentum bias
-    const momentumBias = momentum * currentPrice * 0.1;
-
-    const shortTerm = {
-      low: Math.max(
-        support,
-        currentPrice - ranges['24H'].volatilityRange - ranges['24H'].supportRange + momentumBias
-      ),
-      high: Math.min(
-        resistance,
-        currentPrice + ranges['24H'].volatilityRange + ranges['24H'].resistanceRange + momentumBias
-      ),
-      confidence: calculateConfidence('24H')
-    };
-
-    const midTerm = {
-      low: Math.max(
-        support * 0.95,
-        currentPrice - ranges['7D'].volatilityRange - ranges['7D'].supportRange + (momentumBias * 2)
-      ),
-      high: Math.min(
-        resistance * 1.05,
-        currentPrice + ranges['7D'].volatilityRange + ranges['7D'].resistanceRange + (momentumBias * 2)
-      ),
-      confidence: calculateConfidence('7D')
-    };
-
-    const longTerm = {
-      low: Math.max(
-        support * 0.9,
-        currentPrice - ranges['30D'].volatilityRange - ranges['30D'].supportRange + (momentumBias * 3)
-      ),
-      high: Math.min(
-        resistance * 1.1,
-        currentPrice + ranges['30D'].volatilityRange + ranges['30D'].resistanceRange + (momentumBias * 3)
-      ),
-      confidence: calculateConfidence('30D')
-    };
-
-    console.log('Price Targets Calculation:', {
-      currentPrice,
-      volatility: annualizedVol,
-      momentum,
-      rsi,
-      macd: macd.histogram,
-      trendStrength,
-      shortTerm,
-      midTerm,
-      longTerm
-    });
-
-    return {
-      shortTerm,
-      midTerm,
-      longTerm
-    };
-  }
-
   async getFullAnalysis(crypto: string): Promise<DetailedAnalysis> {
     try {
       // Fetch historical data
@@ -1025,16 +795,6 @@ class AnalysisService {
         }
       ];
 
-      // Calculate predictions
-      const predictions = await this.generatePredictions(
-        prices,
-        currentPrice,
-        volatility,
-        marketPhase,
-        signals,
-        obvTrend,
-        stochRSI
-      );
 
       // Generate AI analysis
       const technicalIndicators: TechnicalIndicators = {
@@ -1064,15 +824,11 @@ class AnalysisService {
         sentiment
       );
 
-      // Parse AI analysis
-      const parsedAnalysis = this.parseAIAnalysis(aiAnalysis);
 
- 
 
       // Updated market summary with date-based formatting and current trend lines
       const latestDateIndex = prices.length - 1;
       const latestPrice = prices[latestDateIndex];
-      const latestVolume = volumes[latestDateIndex];
       const marketSummary = `${crypto.charAt(0).toUpperCase() + crypto.slice(1)} as of ${new Date().toLocaleDateString()} is in a ${marketPhase.toLowerCase()} with ${
         signals[0].signal.toLowerCase()
       } momentum and a ${macd.interpretation.toLowerCase()}. Price is ${

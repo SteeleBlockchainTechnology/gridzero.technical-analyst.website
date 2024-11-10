@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Newspaper, TrendingUp, TrendingDown, Clock, ExternalLink, Image as ImageIcon } from 'lucide-react';
+import React from 'react';
+import { Clock } from 'lucide-react';
 import type { NewsItem } from '../services/types';
 
 interface NewsPanelProps {

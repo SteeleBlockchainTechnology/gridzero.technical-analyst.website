@@ -65,7 +65,7 @@ export const strategyGenerator = {
     }
   },
 
-  determineRecommendation(technicalSignals: any, marketCondition: any): string {
+  determineRecommendation(technicalSignals: any, _marketCondition: any): string {
     const { rsi, macd } = technicalSignals.momentum;
     const trend = technicalSignals.trend.primary;
 
