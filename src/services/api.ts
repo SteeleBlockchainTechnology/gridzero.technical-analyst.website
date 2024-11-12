@@ -237,7 +237,7 @@ export const api = {
           q: `${crypto} OR ${crypto.toLowerCase()} OR ${crypto.toUpperCase()}`,
           language: 'en',
           category: 'business,science,technology,world',
-          size: limit * 2
+          size: limit
         },
         timeout: 10000
       });

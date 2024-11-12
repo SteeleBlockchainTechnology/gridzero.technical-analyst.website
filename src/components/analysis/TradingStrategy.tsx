@@ -58,7 +58,7 @@ export const TradingStrategy: React.FC<TradingStrategyProps> = ({ data }) => {
               animate={{ scale: 1 }}
               transition={{ duration: 0.2, delay: 0.5 }}
             >
-              {data.recommendation} ({data.confidence}%)
+              {`${data.recommendation} (${data.confidence}%)`}
             </motion.div>
           </div>
           <div className="text-xs text-slate-400">
