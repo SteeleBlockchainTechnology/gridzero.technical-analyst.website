@@ -169,4 +169,20 @@ interface AnalysisData {
   marketStructure: {
     trend: string;
   };
+}
+
+export interface FeaturedCoin {
+  id: string;
+  symbol: string;
+  name: string;
+  isActive: boolean;
+}
+
+export interface BatchPriceData {
+  [key: string]: {
+    price: number;
+    change24h: number;
+    timestamp: number;
+    marketCap?: number;
+  };
 } 

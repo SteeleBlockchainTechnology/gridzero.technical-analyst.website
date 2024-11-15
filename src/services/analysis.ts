@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import axios from 'axios';
 import { api } from "./api";
 
-const genAI = new GoogleGenerativeAI("AIzaSyA4cz4YSwsIJmtlh4ml1MNoNeLu43oQqFw");
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
 interface TechnicalIndicators {
   currentPrice: number;

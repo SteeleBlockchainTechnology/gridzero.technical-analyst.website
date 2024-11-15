@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { CryptoPrice, NewsItem, SentimentData, PredictionData } from './types';
+import { CryptoPrice, NewsItem, SentimentData, PredictionData, BatchPriceData } from './types';
 import Sentiment from 'sentiment';
 
 // Initialize sentiment analyzer as a singleton
@@ -671,5 +671,68 @@ export const api = {
         aiTags: ['Sentiment Analysis', 'Market Mood']
       }
     ];
+  },
+
+  async getBatchPrices(coins: string[]): Promise<BatchPriceData> {
+    const cacheKey = `batch-prices-${coins.join('-')}`;
+    
+    if (isValidCache(cacheKey, 'PRICE')) {
+      return cache.get(cacheKey)!.data;
+    }
+
+    try {
+      const response = await axios.get(`${API_BASE}/crypto/price`, {
+        params: { ids: coins.join(',') }
+      });
+
+      const batchData: BatchPriceData = {};
+      
+      coins.forEach(coin => {
+        if (response.data[coin]) {
+          batchData[coin] = {
+            price: response.data[coin].usd,
+            change24h: response.data[coin].usd_24h_change,
+            timestamp: Date.now(),
+            marketCap: response.data[coin].usd_market_cap || 0
+          };
+        }
+      });
+
+      cache.set(cacheKey, { data: batchData, timestamp: Date.now() });
+      return batchData;
+    } catch (error) {
+      console.error('Error fetching batch prices:', error);
+      return {};
+    }
+  },
+
+  async getBatchHistoricalData(coins: string[], days: number = 200) {
+    const cacheKey = `batch-historical-${coins.join('-')}-${days}`;
+    
+    if (isValidCache(cacheKey, 'HISTORICAL')) {
+      return cache.get(cacheKey)!.data;
+    }
+
+    try {
+      const promises = coins.map(coin => 
+        axios.get(`${API_BASE}/crypto/history/${coin}`, {
+          params: { days, interval: 'daily' }
+        })
+      );
+
+      const responses = await Promise.all(promises);
+      const batchData: Record<string, any> = {};
+
+      responses.forEach((response, index) => {
+        const coin = coins[index];
+        batchData[coin] = response.data;
+      });
+
+      cache.set(cacheKey, { data: batchData, timestamp: Date.now() });
+      return batchData;
+    } catch (error) {
+      console.error('Error fetching batch historical data:', error);
+      throw error;
+    }
   }
 }; 

@@ -7,12 +7,14 @@ import { TradingView } from './components/TradingView'
 import { MarketAnalysis } from './components/MarketAnalysis'
 import { AdvancedAnalysis } from './components/AdvancedAnalysis'
 import { api } from './services/api'
-import type { NewsItem, SentimentData, PredictionData, CryptoPrice } from './services/types'
+import type { NewsItem, SentimentData, PredictionData, CryptoPrice, FeaturedCoin } from './services/types'
 import { Coins, Clock, TrendingUp, TrendingDown } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
 import { Button } from "./components/ui/button"
+import { featuredCoinsService } from './services/featuredCoins'
+import { FeaturedCoinsManager } from './components/FeaturedCoinsManager';
 
 export default function App() {
   const [crypto, setCrypto] = useState('bitcoin')
@@ -25,6 +27,7 @@ export default function App() {
   })
   const [predictions, setPredictions] = useState<PredictionData[]>([])
   const [timeframe, setTimeframe] = useState('1D')
+  const [featuredCoins, setFeaturedCoins] = useState<FeaturedCoin[]>([]);
 
   const timeframes = ['1H', '4H', '1D', '1W', '1M']
   const cryptos = [
@@ -60,6 +63,17 @@ export default function App() {
     return () => clearInterval(interval)
   }, [crypto])
 
+  useEffect(() => {
+    setFeaturedCoins(featuredCoinsService.getFeaturedCoins());
+  }, []);
+
+  const handleToggleCoin = (coinId: string) => {
+    const updatedCoins = featuredCoinsService.toggleCoinStatus(coinId);
+    setFeaturedCoins(updatedCoins);
+  };
+
+  const activeFeaturedCoins = featuredCoins.filter(coin => coin.isActive);
+
   return (
     <Layout>
       <div className="container mx-auto p-4 text-white min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
@@ -71,12 +85,12 @@ export default function App() {
                 <div className="flex items-center gap-2">
                   <Coins className="w-8 h-8 text-blue-400" />
                   <Select onValueChange={(value) => setCrypto(value)} defaultValue={crypto}>
-                    <SelectTrigger className="w-[180px] bg-transparent border-none text-2xl font-bold text-gray-200">
+                    <SelectTrigger className="w-[180px]">
                       <SelectValue placeholder="Select Crypto" />
                     </SelectTrigger>
-                    <SelectContent className="bg-gray-800 border-gray-700">
-                      {cryptos.map(({ id, symbol }) => (
-                        <SelectItem key={id} value={id} className="text-white hover:bg-gray-700">
+                    <SelectContent>
+                      {activeFeaturedCoins.map(({ id, symbol }) => (
+                        <SelectItem key={id} value={id}>
                           {symbol}/USD
                         </SelectItem>
                       ))}
@@ -181,9 +195,25 @@ export default function App() {
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.5 }}
               >
-      
+                <FeaturedCoinsManager 
+                  coins={featuredCoins}
+                  onToggleCoin={handleToggleCoin}
+                  onReorderCoins={(coins) => {
+                    featuredCoinsService.reorderCoins(coins);
+                    setFeaturedCoins(coins);
+                  }}
+                  onAddCoin={(coin) => {
+                    const updatedCoins = featuredCoinsService.addCoin(coin);
+                    setFeaturedCoins(updatedCoins);
+                  }}
+                  onRemoveCoin={(coinId) => {
+                    const updatedCoins = featuredCoinsService.removeCoin(coinId);
+                    setFeaturedCoins(updatedCoins);
+                  }}
+                />
               </motion.div>
             </AnimatePresence>
+
             <AnimatePresence>
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
