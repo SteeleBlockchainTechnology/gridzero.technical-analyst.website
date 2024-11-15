@@ -242,7 +242,7 @@ MIT License - see LICENSE.md for details
 
 ## Support
 
-For support, email [support@email.com] or join our Discord channel.
+For support, email [sajan.writings@gmail.com].
 
 ---
 
