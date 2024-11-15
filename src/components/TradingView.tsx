@@ -22,7 +22,6 @@ export const TradingView: React.FC<TradingViewProps> = ({ crypto, timeframe, pri
 
     // Map crypto IDs to TradingView symbols
     const getSymbol = (cryptoId: string) => {
-      // Special cases mapping
       const symbolMap: Record<string, string> = {
         'bitcoin': 'BTCUSDT',
         'ethereum': 'ETHUSDT',
@@ -41,31 +40,11 @@ export const TradingView: React.FC<TradingViewProps> = ({ crypto, timeframe, pri
         'uniswap': 'UNIUSDT',
       };
 
-      // If we have a direct mapping, use it
-      if (symbolMap[cryptoId]) {
-        return `BINANCE:${symbolMap[cryptoId]}`;
-      }
+      // Use mapped symbol if available, otherwise construct it
+      const symbol = symbolMap[cryptoId] || 
+        cryptoId.replace(/-/g, '').toUpperCase() + 'USDT';
 
-      // Handle special cases with hyphens
-      const parts = cryptoId.split('-');
-      let symbol;
-      
-      if (parts.length > 1) {
-        // Take the first part of hyphenated names
-        symbol = parts[0].toUpperCase();
-      } else {
-        // For non-hyphenated names, just convert to uppercase
-        symbol = cryptoId.toUpperCase();
-      }
-
-      // Special case handling for tokens that need their full name
-      const specialTokens = ['INJ', 'RENDER', 'DOT', 'LINK', 'MATIC'];
-      if (specialTokens.includes(symbol)) {
-        return `BINANCE:${symbol}USDT`;
-      }
-
-      // Try to construct a valid symbol
-      return `BINANCE:${symbol}USDT`;
+      return `BINANCE:${symbol}`;
     };
 
     if (container.current) {
@@ -104,14 +83,37 @@ export const TradingView: React.FC<TradingViewProps> = ({ crypto, timeframe, pri
         "popup_width": "1000",
         "popup_height": "650",
         "container_id": `tradingview_${crypto}_${Date.now()}`,
+        // Add current price overlay
+        "overrides": {
+          "paneProperties.background": "rgba(0, 0, 0, 0.1)",
+          "paneProperties.vertGridProperties.color": "rgba(255, 255, 255, 0.06)",
+          "paneProperties.horzGridProperties.color": "rgba(255, 255, 255, 0.06)",
+          "scalesProperties.textColor": "#AAA",
+          "mainSeriesProperties.priceLineColor": price.change24h >= 0 ? "#26a69a" : "#ef5350",
+          "mainSeriesProperties.priceLineWidth": 2,
+          "mainSeriesProperties.showPriceLine": true,
+        }
       };
 
       script.innerHTML = JSON.stringify(config);
 
       // Create widget container
       const widgetContainer = document.createElement('div');
-      widgetContainer.className = 'tradingview-widget-container';
+      widgetContainer.className = 'tradingview-widget-container relative';
       
+      // Add current price overlay
+      const priceOverlay = document.createElement('div');
+      priceOverlay.className = 'absolute top-4 right-4 bg-black/50 backdrop-blur-sm rounded-lg p-2 text-sm';
+      priceOverlay.innerHTML = `
+        <div class="flex items-center gap-2">
+          <span class="text-white font-medium">$${price.price.toLocaleString()}</span>
+          <span class="${price.change24h >= 0 ? 'text-green-400' : 'text-red-400'}">
+            ${price.change24h >= 0 ? '+' : ''}${price.change24h.toFixed(2)}%
+          </span>
+        </div>
+      `;
+      
+      widgetContainer.appendChild(priceOverlay);
       container.current.appendChild(widgetContainer);
       widgetContainer.appendChild(script);
     }
@@ -122,7 +124,7 @@ export const TradingView: React.FC<TradingViewProps> = ({ crypto, timeframe, pri
         container.current.innerHTML = '';
       }
     };
-  }, [crypto, timeframe]);
+  }, [crypto, timeframe, price]); // Add price to dependency array
 
   return (
     <div 

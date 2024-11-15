@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { Brain, TrendingUp, TrendingDown, Activity, Target, AlertTriangle, Clock, BarChart, LineChart, PieChart } from 'lucide-react';
 import { analysisService } from '../services/analysis';
 import { motion } from 'framer-motion';
+import { PredictionData } from '@/services/types';
 
 interface MarketAnalysisProps {
   crypto: string;
+  predictions: PredictionData[];
 }
 
 interface Signal {
@@ -19,6 +21,7 @@ interface AnalysisData {
     '24H': { range: string; confidence: string };
     '7D': { range: string; confidence: string };
     '30D': { range: string; confidence: string };
+    externalPredictions: PredictionData[];
   };
   signals: Signal[];
   strategy: {
@@ -158,7 +161,7 @@ const formatAIAnalysis = (htmlContent: string) => {
   );
 };
 
-export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto }) => {
+export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto, predictions }) => {
   const [analysis, setAnalysis] = useState<AnalysisData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -172,7 +175,17 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto }) => {
         if (!result) {
           throw new Error('No analysis data available');
         }
-        setAnalysis(result);
+
+        // Merge external predictions with analysis data
+        const mergedAnalysis = {
+          ...result,
+          priceTargets: {
+            ...result.priceTargets,
+            externalPredictions: predictions // Add external predictions
+          }
+        };
+
+        setAnalysis(mergedAnalysis);
       } catch (err) {
         console.error('Error in MarketAnalysis:', err);
         setError('Failed to fetch market analysis');
@@ -182,7 +195,8 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto }) => {
           priceTargets: {
             '24H': { range: 'N/A', confidence: '0' },
             '7D': { range: 'N/A', confidence: '0' },
-            '30D': { range: 'N/A', confidence: '0' }
+            '30D': { range: 'N/A', confidence: '0' },
+            externalPredictions: predictions // Include predictions even in error state
           },
           signals: [],
           strategy: {
@@ -201,7 +215,7 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto }) => {
     };
 
     fetchAnalysis();
-  }, [crypto]);
+  }, [crypto, predictions]); // Add predictions to dependency array
 
   if (loading) {
     const loadingSteps = [

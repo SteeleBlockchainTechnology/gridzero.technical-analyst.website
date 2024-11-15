@@ -236,3 +236,20 @@ const CACHE_DURATION = {
 - Follow component structure guidelines
 - Include proper documentation
 
+## License
+
+MIT License - see LICENSE.md for details
+
+## Support
+
+For support, email [support@email.com] or join our Discord channel.
+
+---
+
+## Acknowledgments
+
+- TensorFlow.js team
+- CoinGecko API
+- NewsData API
+- Open source contributors
+

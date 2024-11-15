@@ -17,9 +17,18 @@ export const strategyGenerator = {
         throw new Error('Invalid current price');
       }
 
-      // Calculate entries
-      const conservative = this.calculateConservativeEntry(currentPrice, technicalSignals, marketCondition);
-      const aggressive = this.calculateAggressiveEntry(currentPrice, technicalSignals, marketCondition);
+      // Use marketCondition to calculate entries
+      const conservative = this.calculateConservativeEntry(
+        currentPrice, 
+        technicalSignals, 
+        marketCondition.keyLevels // Use key levels from market condition
+      );
+      
+      const aggressive = this.calculateAggressiveEntry(
+        currentPrice, 
+        technicalSignals, 
+        marketCondition.keyLevels // Use key levels from market condition
+      );
 
       const entries = {
         conservative: Number(conservative.toFixed(2)),
@@ -29,32 +38,34 @@ export const strategyGenerator = {
 
       // Validate entries
       if (isNaN(entries.aggressive) || entries.aggressive === 0) {
-        entries.aggressive = Number((currentPrice * 1.02).toFixed(2)); // Default to 2% above current price
+        entries.aggressive = Number((currentPrice * 1.02).toFixed(2));
       }
 
-      // Determine base recommendation
-      const { recommendation, confidence } = this.determineRecommendation(technicalSignals, marketCondition);
+      // Use market condition for recommendation
+      const { recommendation, confidence } = this.determineRecommendation(
+        technicalSignals, 
+        marketCondition
+      );
 
-      // Format recommendation string only once
-      const formattedRecommendation = recommendation; // Remove the confidence from here
-
+      // Calculate stop loss based on market condition
       const stopLoss = {
-        tight: Number((currentPrice * 0.98).toFixed(2)),    // 2% below entry
-        normal: Number((currentPrice * 0.97).toFixed(2)),   // 3% below entry
-        wide: Number((currentPrice * 0.95).toFixed(2))      // 5% below entry
+        tight: Number((currentPrice * (1 - this.calculateStopLossDistance(marketCondition, 'tight'))).toFixed(2)),
+        normal: Number((currentPrice * (1 - this.calculateStopLossDistance(marketCondition, 'normal'))).toFixed(2)),
+        wide: Number((currentPrice * (1 - this.calculateStopLossDistance(marketCondition, 'wide'))).toFixed(2))
       };
 
+      // Calculate targets based on market condition
       const targets = {
-        primary: Number((currentPrice * 1.03).toFixed(2)),    // 3% above entry
-        secondary: Number((currentPrice * 1.05).toFixed(2)),  // 5% above entry
-        final: Number((currentPrice * 1.08).toFixed(2))       // 8% above entry
+        primary: Number((currentPrice * (1 + this.calculateTargetDistance(marketCondition, 'primary'))).toFixed(2)),
+        secondary: Number((currentPrice * (1 + this.calculateTargetDistance(marketCondition, 'secondary'))).toFixed(2)),
+        final: Number((currentPrice * (1 + this.calculateTargetDistance(marketCondition, 'final'))).toFixed(2))
       };
 
       const rationale = this.generateRationale(technicalSignals, marketCondition);
 
       return {
-        recommendation: formattedRecommendation, // Just return the recommendation text
-        confidence, // Return confidence separately
+        recommendation: `${recommendation} (${confidence}%)`,
+        confidence,
         entries,
         stopLoss,
         targets,
@@ -65,6 +76,33 @@ export const strategyGenerator = {
       console.error('Error generating strategy:', error);
       return this.getDefaultStrategy();
     }
+  },
+
+  calculateStopLossDistance(marketCondition: any, type: 'tight' | 'normal' | 'wide'): number {
+    const volatility = marketCondition.strength || 0.5;
+    const multipliers = {
+      tight: 2,
+      normal: 3,
+      wide: 5
+    };
+    return (volatility * multipliers[type]) / 100;
+  },
+
+  calculateTargetDistance(marketCondition: any, type: 'primary' | 'secondary' | 'final'): number {
+    const trend = marketCondition.phase.toLowerCase();
+    const strength = marketCondition.strength || 0.5;
+    
+    const baseMultipliers = {
+      primary: 3,
+      secondary: 5,
+      final: 8
+    };
+
+    // Adjust multipliers based on market phase
+    const trendMultiplier = trend === 'bull market' ? 1.5 :
+                           trend === 'bear market' ? 0.5 : 1;
+
+    return (baseMultipliers[type] * strength * trendMultiplier) / 100;
   },
 
   determineRecommendation(technicalSignals: any, marketCondition: any): { recommendation: string; confidence: number } {
@@ -118,8 +156,13 @@ export const strategyGenerator = {
     ));
   },
 
-  calculateConservativeEntry(currentPrice: number, technicalSignals: any, marketCondition: any): number {
-    const support = marketCondition.keyLevels.support;
+  calculateConservativeEntry(
+    currentPrice: number, 
+    technicalSignals: any, 
+    keyLevels: any
+  ): number {
+    // Use key levels from market condition for support
+    const support = keyLevels.support || currentPrice * 0.95;
     const volatility = technicalSignals.volatility.current / 100;
     
     // Conservative entry near support level
@@ -129,18 +172,20 @@ export const strategyGenerator = {
     );
   },
 
-  calculateAggressiveEntry(currentPrice: number, technicalSignals: any, marketCondition: any): number {
-    const resistance = marketCondition.keyLevels.resistance;
+  calculateAggressiveEntry(
+    currentPrice: number, 
+    technicalSignals: any, 
+    keyLevels: any
+  ): number {
+    // Use key levels from market condition for resistance
+    const resistance = keyLevels.resistance || currentPrice * 1.05;
     const volatility = technicalSignals.volatility.current / 100;
     
     // Aggressive entry should be between current price and resistance
     const entryPoint = currentPrice * (1 + Math.min(0.03, volatility)); // Max 3% above current price
     
     // Ensure entry doesn't exceed resistance
-    return Math.min(
-      entryPoint,
-      resistance
-    );
+    return Math.min(entryPoint, resistance);
   },
 
   calculateStopLoss(price: number, percentage: number): number {
@@ -153,20 +198,44 @@ export const strategyGenerator = {
 
   determineTimeframe(technicalSignals: any, marketCondition: any): string {
     const volatility = technicalSignals.volatility.current;
-    if (volatility > 50) return 'Short-term';
-    if (volatility < 20) return 'Long-term';
-    return 'Medium-term';
+    const marketPhase = marketCondition.phase.toLowerCase();
+    const strength = marketCondition.strength || 0.5;
+
+    // Determine timeframe based on market conditions
+    if (marketPhase === 'bull market' && strength > 0.7) {
+      return volatility > 50 ? 'Short-term' : 'Medium-term';
+    } else if (marketPhase === 'bear market' && strength > 0.7) {
+      return 'Long-term';
+    } else if (marketPhase === 'accumulation') {
+      return 'Medium-term';
+    } else if (marketPhase === 'distribution') {
+      return 'Short-term';
+    }
+
+    // Default based on volatility
+    return volatility > 50 ? 'Short-term' : 
+           volatility < 20 ? 'Long-term' : 'Medium-term';
   },
 
   generateRationale(technicalSignals: any, marketCondition: any): string[] {
-    const rationale = [];
+    const rationale: string[] = [];
     
+    // Add market phase rationale
+    rationale.push(`Market Phase: ${marketCondition.phase} with ${(marketCondition.strength * 100).toFixed(1)}% strength`);
+    
+    // Add technical signals
     rationale.push(`RSI: ${technicalSignals.momentum.rsi.signal}`);
     rationale.push(`MACD: ${technicalSignals.momentum.macd.signal}`);
-    rationale.push(`STOCHRSI: ${technicalSignals.momentum.stochRSI.signal}`);
+    
+    // Add market structure
+    if (marketCondition.keyLevels) {
+      rationale.push(`Support at $${marketCondition.keyLevels.support.toFixed(2)}`);
+      rationale.push(`Resistance at $${marketCondition.keyLevels.resistance.toFixed(2)}`);
+    }
 
-    if (marketCondition.strength > 0.6) {
-      rationale.push(`Strong ${marketCondition.phase} phase`);
+    // Add trend strength
+    if (technicalSignals.trend.strength > 0.7) {
+      rationale.push(`Strong ${technicalSignals.trend.primary} trend`);
     }
 
     return rationale;
@@ -175,7 +244,7 @@ export const strategyGenerator = {
   getDefaultStrategy(): TradingStrategy {
     const defaultPrice = 76000;
     return {
-      recommendation: 'Hold (50%)',
+      recommendation: 'Hold',
       confidence: 50,
       entries: {
         conservative: defaultPrice * 0.98,

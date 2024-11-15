@@ -6,8 +6,14 @@ import { PricePredictions } from './analysis/PricePredictions';
 import { RiskAnalysis } from './analysis/RiskAnalysis';
 import { TradingStrategy } from './analysis/TradingStrategy';
 import { Loader2 } from 'lucide-react';
+import { PredictionData } from '@/services/types';
 
-export const AdvancedAnalysis = ({ crypto }: { crypto: string }) => {
+interface AdvancedAnalysisProps {
+  crypto: string;
+  predictions: PredictionData[];
+}
+
+export const AdvancedAnalysis = ({ crypto, predictions }: AdvancedAnalysisProps) => {
   const { analysis, loading, error } = useAdvancedAnalysis(crypto);
 
   if (loading) {
@@ -59,12 +65,18 @@ export const AdvancedAnalysis = ({ crypto }: { crypto: string }) => {
     );
   }
 
+  // Merge predictions from props with analysis predictions
+  const mergedPredictions = {
+    ...analysis.predictions,
+    externalPredictions: predictions // Add external predictions to the analysis
+  };
+
   return (
     <div className="grid grid-cols-2 gap-4 text-white">
       <MarketPhase data={analysis.marketCondition} />
       <TechnicalSignals data={analysis.technicalSignals} />
       <SentimentOverview data={analysis.sentimentAnalysis} />
-      <PricePredictions data={analysis.predictions} />
+      <PricePredictions data={mergedPredictions} /> {/* Pass merged predictions */}
       <RiskAnalysis data={analysis.riskAnalysis} />
       <TradingStrategy data={analysis.tradingStrategy} />
     </div>

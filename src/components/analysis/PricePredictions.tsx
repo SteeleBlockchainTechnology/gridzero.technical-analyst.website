@@ -4,25 +4,29 @@ import React from 'react'
 import { Brain, TrendingUp, TrendingDown } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { PredictionData } from '@/services/types'
+
+interface PricePredictionsData {
+  shortTerm: {
+    price: { low: number; high: number }
+    confidence: number
+    signals: string[]
+  }
+  midTerm: {
+    price: { low: number; high: number }
+    confidence: number
+    signals: string[]
+  }
+  longTerm: {
+    price: { low: number; high: number }
+    confidence: number
+    signals: string[]
+  }
+  externalPredictions?: PredictionData[]
+}
 
 interface PricePredictionsProps {
-  data: {
-    shortTerm: {
-      price: { low: number; high: number }
-      confidence: number
-      signals: string[]
-    }
-    midTerm: {
-      price: { low: number; high: number }
-      confidence: number
-      signals: string[]
-    }
-    longTerm: {
-      price: { low: number; high: number }
-      confidence: number
-      signals: string[]
-    }
-  }
+  data: PricePredictionsData
 }
 
 export const PricePredictions: React.FC<PricePredictionsProps> = ({ data }) => {

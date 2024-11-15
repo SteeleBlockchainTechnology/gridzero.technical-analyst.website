@@ -73,6 +73,32 @@ export interface TradingStrategy {
   rationale: string[];
 }
 
+export interface Signal {
+  text: string;
+  importance: string;
+}
+
+export interface AnalysisData {
+  summary: string;
+  aiAnalysis: string;
+  priceTargets: {
+    '24H': { range: string; confidence: string };
+    '7D': { range: string; confidence: string };
+    '30D': { range: string; confidence: string };
+    externalPredictions?: PredictionData[];
+  };
+  signals: Signal[];
+  strategy: {
+    position: string;
+    entry: string;
+    stop: string;
+    target: string;
+  };
+  marketStructure: {
+    trend: string;
+  };
+}
+
 export interface TechnicalIndicators {
   currentPrice: number;
   price_change_24h: number;
@@ -124,31 +150,7 @@ export interface TechnicalSignals {
   };
 }
 
-
 export interface DetailedAnalysis {
-  summary: string;
-  aiAnalysis: string;
-  priceTargets: {
-    '24H': { range: string; confidence: string };
-    '7D': { range: string; confidence: string };
-    '30D': { range: string; confidence: string };
-  };
-  signals: Array<{
-    text: string;
-    importance: string;
-  }>;
-  strategy: {
-    position: string;
-    entry: string;
-    stop: string;
-    target: string;
-  };
-  marketStructure: {
-    trend: string;
-  };
-}
-
-interface AnalysisData {
   summary: string;
   aiAnalysis: string;
   priceTargets: {

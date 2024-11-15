@@ -7,7 +7,7 @@ import { TradingView } from './components/TradingView'
 import { MarketAnalysis } from './components/MarketAnalysis'
 import { AdvancedAnalysis } from './components/AdvancedAnalysis'
 import { api } from './services/api'
-import type { NewsItem, SentimentData, PredictionData, CryptoPrice, FeaturedCoin } from './services/types'
+import type { NewsItem, PredictionData, CryptoPrice, FeaturedCoin } from './services/types'
 import { Coins, Clock, TrendingUp, TrendingDown } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
@@ -19,7 +19,6 @@ import { FeaturedCoinsManager } from './components/FeaturedCoinsManager';
 export default function App() {
   const [crypto, setCrypto] = useState('bitcoin')
   const [news, setNews] = useState<NewsItem[]>([])
-  const [sentiment, setSentiment] = useState<SentimentData[]>([])
   const [price, setPrice] = useState<CryptoPrice>({
     price: 0,
     change24h: 0,
@@ -30,26 +29,18 @@ export default function App() {
   const [featuredCoins, setFeaturedCoins] = useState<FeaturedCoin[]>([]);
 
   const timeframes = ['1H', '4H', '1D', '1W', '1M']
-  const cryptos = [
-    { id: 'bitcoin', symbol: 'BTC' },
-    { id: 'ethereum', symbol: 'ETH' },
-    { id: 'binancecoin', symbol: 'BNB' },
-    { id: 'cardano', symbol: 'ADA' },
-    { id: 'solana', symbol: 'SOL' }
-  ]
+
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [newsData, sentimentData, priceData, predictionsData] = await Promise.all([
+        const [newsData, priceData, predictionsData] = await Promise.all([
           api.getNews(crypto),
-          api.getSentiment(crypto),
           api.getPrice(crypto),
           api.getPredictions(crypto)
         ])
 
         setNews(newsData.news)
-        setSentiment(sentimentData)
         setPrice(priceData)
         setPredictions(predictionsData)
       } catch (error) {
@@ -162,7 +153,10 @@ export default function App() {
                     <CardTitle className="text-xl font-bold text-blue-300">Market Analysis</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <MarketAnalysis crypto={crypto} />
+                    <MarketAnalysis 
+                      crypto={crypto} 
+                      predictions={predictions}
+                    />
                   </CardContent>
                 </Card>
               </motion.div>
@@ -179,7 +173,10 @@ export default function App() {
                     <CardTitle className="text-xl font-bold text-blue-300">Advanced Analysis</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <AdvancedAnalysis crypto={crypto} />
+                    <AdvancedAnalysis 
+                      crypto={crypto}
+                      predictions={predictions}
+                    />
                   </CardContent>
                 </Card>
               </motion.div>
