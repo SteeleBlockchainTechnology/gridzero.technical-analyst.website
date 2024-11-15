@@ -69,7 +69,7 @@ class AnalysisService {
     try {
       console.log(`Fetching historical data for ${crypto}...`);
       const response = await axios.get(
-        `http://localhost:3001/api/crypto/history/${crypto}`, {
+        `https://crypto-sensei.vercel.app/:3001/api/crypto/history/${crypto}`, {
           params: {
             days: days,
             interval: 'daily'

@@ -22,7 +22,7 @@ class WebSocketService {
         clearInterval(this.heartbeatInterval);
       }
 
-      this.ws = new WebSocket(`ws://localhost:3001`);
+      this.ws = new WebSocket(`ws://crypto-sensei.vercel.app:3001`);
 
       this.ws.onopen = () => {
         console.log('WebSocket connected successfully');
@@ -92,7 +92,7 @@ class WebSocketService {
     const pollPrice = async () => {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
         try {
-          const response = await axios.get(`http://localhost:3001/api/crypto/price/${this.currentCrypto}`);
+          const response = await axios.get(`https://crypto-sensei.vercel.app:3001/api/crypto/price/${this.currentCrypto}`);
           if (response.data && response.data[this.currentCrypto]) {
             const price = {
               price: parseFloat(response.data[this.currentCrypto].usd),

@@ -179,7 +179,7 @@ VITE_GEMINI_API_KEY=your_gemini_api_key
 ### WebSocket API
 ```typescript
 // Connect to WebSocket
-const ws = new WebSocket(`ws://localhost:3001`);
+const ws = new WebSocket(`ws://crypto-sensei.vercel.app:3001`);
 
 // Subscribe to crypto updates
 ws.send(JSON.stringify({

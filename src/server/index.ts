@@ -14,7 +14,7 @@ const PORT = process.env.VITE_PORT || 3001;
 
 // CORS configuration
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+  origin: ['https://crypto-sensei.vercel.app', 'https://crypto-sensei.vercel.app'],
   methods: ['GET', 'POST', 'OPTIONS'],
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -429,7 +429,7 @@ wss.on('connection', (ws: WebSocket) => {
 
 // Start server
 server.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`Server running at https://crypto-sensei.vercel.app:${PORT}`);
 });
 
 // Error handling
