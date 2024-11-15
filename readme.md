@@ -1,6 +1,6 @@
-# Cryptocurrency Analysis & Trading Platform
+# CryptoSensei
 
-A sophisticated real-time cryptocurrency analysis platform that combines technical analysis, sentiment analysis, and AI-powered predictions to provide comprehensive market insights and trading recommendations.
+A complete real-time cryptocurrency analysis platform that combines technical analysis, sentiment analysis, trading volume data, news trends, and AI-powered predictions to provide comprehensive market insights and trading recommendations.
 
 ## Table of Contents
 1. [Overview](#overview)
