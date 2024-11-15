@@ -181,7 +181,7 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto, predicti
           ...result,
           priceTargets: {
             ...result.priceTargets,
-            externalPredictions: predictions // Add external predictions
+            externalPredictions: predictions
           }
         };
 
@@ -196,7 +196,7 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto, predicti
             '24H': { range: 'N/A', confidence: '0' },
             '7D': { range: 'N/A', confidence: '0' },
             '30D': { range: 'N/A', confidence: '0' },
-            externalPredictions: predictions // Include predictions even in error state
+            externalPredictions: predictions
           },
           signals: [],
           strategy: {
@@ -215,7 +215,7 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto, predicti
     };
 
     fetchAnalysis();
-  }, [crypto, predictions]); // Add predictions to dependency array
+  }, [crypto, predictions]); // Only depend on crypto and predictions changes
 
   if (loading) {
     const loadingSteps = [

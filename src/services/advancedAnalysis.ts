@@ -559,13 +559,52 @@ class AdvancedAnalysisService {
     }
   }
 
-  // Update determineTrendDirection to use pre-calculated MAs
   private determineTrendDirection(prices: number[], smaResults: { ma20: number; ma50: number; ma200: number }): string {
+    const currentPrice = prices[prices.length - 1];
     const { ma20, ma50, ma200 } = smaResults;
+
+    // Calculate price position relative to moving averages
+    const aboveMa20 = currentPrice > ma20;
+    const aboveMa50 = currentPrice > ma50;
+    const aboveMa200 = currentPrice > ma200;
+
+    // Calculate short-term trend using recent prices
+    const shortTermPrices = prices.slice(-20);
+    const shortTermTrend = this.calculatePriceSlope(shortTermPrices);
+
+    // Determine trend based on moving averages and price position
+    if (aboveMa20 && aboveMa50 && aboveMa200 && shortTermTrend > 0) {
+      return 'Strong Bullish';
+    } else if (aboveMa20 && aboveMa50 && shortTermTrend > 0) {
+      return 'Bullish';
+    } else if (!aboveMa20 && !aboveMa50 && !aboveMa200 && shortTermTrend < 0) {
+      return 'Strong Bearish';
+    } else if (!aboveMa20 && !aboveMa50 && shortTermTrend < 0) {
+      return 'Bearish';
+    } else {
+      return 'Neutral';
+    }
+  }
+
+  private calculatePriceSlope(prices: number[]): number {
+    if (prices.length < 2) return 0;
     
-    if (ma20 > ma50 && ma50 > ma200) return 'bullish';
-    if (ma20 < ma50 && ma50 < ma200) return 'bearish';
-    return 'neutral';
+    // Calculate linear regression slope
+    const n = prices.length;
+    let sumX = 0;
+    let sumY = 0;
+    let sumXY = 0;
+    let sumXX = 0;
+
+    for (let i = 0; i < n; i++) {
+      sumX += i;
+      sumY += prices[i];
+      sumXY += i * prices[i];
+      sumXX += i * i;
+    }
+
+    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    return slope;
   }
 
   private calculateRSI(prices: number[], period: number = 14): number {

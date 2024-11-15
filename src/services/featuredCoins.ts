@@ -1,5 +1,4 @@
 import { FeaturedCoin } from './types';
-import { api } from './api';
 
 const DEFAULT_FEATURED_COINS: FeaturedCoin[] = [
   { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin', isActive: true },

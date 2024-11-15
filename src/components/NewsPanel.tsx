@@ -7,7 +7,7 @@ interface NewsPanelProps {
   news: NewsItem[];
 }
 
-export const NewsPanel: React.FC<NewsPanelProps> = ({ crypto, news }) => {
+export const NewsPanel: React.FC<NewsPanelProps> = ({ news }) => {
   // Remove duplicate news based on title
   const uniqueNews = news.filter((item, index, self) =>
     index === self.findIndex((t) => t.title === item.title)

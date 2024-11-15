@@ -32,27 +32,38 @@ export default function App() {
 
 
   useEffect(() => {
+    const fetchPriceData = async () => {
+      try {
+        const priceData = await api.getPrice(crypto);
+        setPrice(priceData);
+      } catch (error) {
+        console.error('Error fetching price data:', error);
+      }
+    };
+
+    fetchPriceData();
+    const priceInterval = setInterval(fetchPriceData, 60000);
+
+    return () => clearInterval(priceInterval);
+  }, [crypto]);
+
+  useEffect(() => {
     const fetchData = async () => {
       try {
-        const [newsData, priceData, predictionsData] = await Promise.all([
+        const [newsData, predictionsData] = await Promise.all([
           api.getNews(crypto),
-          api.getPrice(crypto),
           api.getPredictions(crypto)
-        ])
+        ]);
 
-        setNews(newsData.news)
-        setPrice(priceData)
-        setPredictions(predictionsData)
+        setNews(newsData.news);
+        setPredictions(predictionsData);
       } catch (error) {
-        console.error('Error fetching data:', error)
+        console.error('Error fetching data:', error);
       }
-    }
+    };
 
-    fetchData()
-    const interval = setInterval(fetchData, 60000)
-
-    return () => clearInterval(interval)
-  }, [crypto])
+    fetchData();
+  }, [crypto]);
 
   useEffect(() => {
     setFeaturedCoins(featuredCoinsService.getFeaturedCoins());

@@ -6,7 +6,7 @@ import Sentiment from 'sentiment';
 const sentimentAnalyzer = new Sentiment();
 
 // API Configuration
-const API_BASE = 'http://localhost:3001/api';
+const API_BASE = 'https://api.coingecko.com/api/v3';
 
 // Basic cache entry interface
 interface CacheEntry {
@@ -681,27 +681,40 @@ export const api = {
     }
 
     try {
-      const response = await axios.get(`${API_BASE}/crypto/price`, {
-        params: { ids: coins.join(',') }
+      // Use CoinGecko's API for batch price data
+      const response = await axios.get(`${API_BASE}/simple/price`, {
+        params: {
+          ids: coins.join(','),
+          vs_currencies: 'usd',
+          include_24hr_change: true,
+          include_market_cap: true
+        }
       });
 
       const batchData: BatchPriceData = {};
       
-      coins.forEach(coin => {
-        if (response.data[coin]) {
-          batchData[coin] = {
-            price: response.data[coin].usd,
-            change24h: response.data[coin].usd_24h_change,
-            timestamp: Date.now(),
-            marketCap: response.data[coin].usd_market_cap || 0
-          };
-        }
+      Object.entries(response.data).forEach(([id, data]: [string, any]) => {
+        batchData[id] = {
+          price: data.usd,
+          change24h: data.usd_24h_change,
+          timestamp: Date.now(),
+          marketCap: data.usd_market_cap
+        };
       });
 
       cache.set(cacheKey, { data: batchData, timestamp: Date.now() });
       return batchData;
     } catch (error) {
       console.error('Error fetching batch prices:', error);
+      
+      // Return cached data if available, even if expired
+      const cachedData = cache.get(cacheKey);
+      if (cachedData) {
+        console.log('Using expired cache due to API error');
+        return cachedData.data;
+      }
+      
+      // Return empty object if no cache available
       return {};
     }
   },
@@ -715,8 +728,12 @@ export const api = {
 
     try {
       const promises = coins.map(coin => 
-        axios.get(`${API_BASE}/crypto/history/${coin}`, {
-          params: { days, interval: 'daily' }
+        axios.get(`${API_BASE}/coins/${coin}/market_chart`, {
+          params: {
+            vs_currency: 'usd',
+            days,
+            interval: 'daily'
+          }
         })
       );
 
@@ -732,6 +749,27 @@ export const api = {
       return batchData;
     } catch (error) {
       console.error('Error fetching batch historical data:', error);
+      
+      // Return cached data if available
+      const cachedData = cache.get(cacheKey);
+      if (cachedData) {
+        return cachedData.data;
+      }
+      
+      throw error;
+    }
+  },
+
+  // Add rate limiting and error handling
+  async handleRateLimit(fn: () => Promise<any>) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      if (error.response?.status === 429) {
+        console.log('Rate limited, waiting before retry...');
+        await new Promise(resolve => setTimeout(resolve, 60000));
+        return await fn();
+      }
       throw error;
     }
   }
