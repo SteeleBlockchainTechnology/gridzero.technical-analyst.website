@@ -6,7 +6,7 @@ import Sentiment from 'sentiment';
 const sentimentAnalyzer = new Sentiment();
 
 // API Configuration
-const API_BASE = 'https://api.coingecko.com/api/v3';
+const COINGECKO_API = 'https://api.coingecko.com/api/v3';
 
 // Basic cache entry interface
 interface CacheEntry {
@@ -100,7 +100,7 @@ export const api = {
 
     try {
       const response = await axios.get(
-        `${API_BASE}/crypto/price/${crypto}`
+        `${COINGECKO_API}/crypto/price/${crypto}`
       );
 
       const cryptoId = crypto.toLowerCase();
@@ -134,39 +134,37 @@ export const api = {
   async getHistoricalData(crypto: string, days: number = 200) {
     const cacheKey = `historical-${crypto}-${days}`;
     
-    // Check cache first
     if (isValidCache(cacheKey, 'HISTORICAL')) {
       return cache.get(cacheKey)!.data;
     }
 
     try {
-      console.log(`Fetching historical data for ${crypto}...`);
-      const response = await axios.get(
-        `https://crypto-sensei.vercel.app:3001/api/crypto/history/${crypto}`, {
-          params: {
-            days: days,
-            interval: 'daily'
-          }
+      const response = await axios.get(`${COINGECKO_API}/coins/${crypto}/market_chart`, {
+        params: {
+          vs_currency: 'usd',
+          days,
+          interval: 'daily'
         }
-      );
-      
-      const data = response.data;
+      });
 
-      // Process the data
-      const historicalData = {
-        prices: data.prices.map((item: any) => Number(item.price)),
-        volumes: data.total_volumes.map((item: any) => Number(item.value)),
-        market_caps: data.market_caps.map((item: any) => Number(item.value)),
-        current_price: Number(data.current_price),
-        market_cap: Number(data.market_cap),
-        price_change_24h: Number(data.price_change_24h),
-        total_volume: Number(data.total_volume)
+      // Transform data to match expected format
+      const transformedData = {
+        prices: response.data.prices.map((item: [number, number]) => ({
+          timestamp: item[0],
+          price: item[1]
+        })),
+        total_volumes: response.data.total_volumes.map((item: [number, number]) => ({
+          timestamp: item[0],
+          value: item[1]
+        })),
+        market_caps: response.data.market_caps.map((item: [number, number]) => ({
+          timestamp: item[0],
+          value: item[1]
+        }))
       };
 
-      // Cache the processed data
-      cache.set(cacheKey, { data: historicalData, timestamp: Date.now() });
-      
-      return historicalData;
+      cache.set(cacheKey, { data: transformedData, timestamp: Date.now() });
+      return transformedData;
     } catch (error) {
       console.error('Error fetching historical data:', error);
       throw error;
@@ -596,7 +594,7 @@ export const api = {
 
     try {
       const response = await axios.get(
-        `${API_BASE}/crypto/history/${crypto}`, {
+        `${COINGECKO_API}/crypto/history/${crypto}`, {
           params: { days }
         }
       );
@@ -681,12 +679,11 @@ export const api = {
     }
 
     try {
-      // Use CoinGecko's API for batch price data
-      const response = await axios.get(`${API_BASE}/simple/price`, {
+      const response = await axios.get(`${COINGECKO_API}/simple/price`, {
         params: {
           ids: coins.join(','),
           vs_currencies: 'usd',
-          include_24hr_change: true,
+          include_24h_change: true,
           include_market_cap: true
         }
       });
@@ -706,15 +703,6 @@ export const api = {
       return batchData;
     } catch (error) {
       console.error('Error fetching batch prices:', error);
-      
-      // Return cached data if available, even if expired
-      const cachedData = cache.get(cacheKey);
-      if (cachedData) {
-        console.log('Using expired cache due to API error');
-        return cachedData.data;
-      }
-      
-      // Return empty object if no cache available
       return {};
     }
   },
@@ -728,7 +716,7 @@ export const api = {
 
     try {
       const promises = coins.map(coin => 
-        axios.get(`${API_BASE}/coins/${coin}/market_chart`, {
+        axios.get(`${COINGECKO_API}/coins/${coin}/market_chart`, {
           params: {
             vs_currency: 'usd',
             days,
