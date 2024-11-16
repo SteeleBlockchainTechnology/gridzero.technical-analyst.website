@@ -37,7 +37,7 @@ interface HistoricalData {
   market_caps: HistoricalDataItem[];
 }
 
-export const api = {
+export const api = { 
   async getPrice(crypto: string): Promise<CryptoPrice> {
     const cacheKey = `price-${crypto}`;
     
