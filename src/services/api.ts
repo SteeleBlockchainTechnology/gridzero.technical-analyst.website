@@ -23,7 +23,7 @@ interface NewsCacheEntry extends CacheEntry {
 // Enhanced cache configuration
 const CACHE_DURATION = {
   PRICE: 1 * 60 * 1000,        // 1 minute
-  NEWS: 3 * 60 * 60 * 1000,    // 3 hours
+  NEWS: 15 * 60 * 1000,        // 15 minutes
   HISTORICAL: 5 * 60 * 1000,   // 5 minutes
   SENTIMENT: 30 * 60 * 1000,   // 30 minutes
 };
@@ -99,35 +99,26 @@ export const api = {
     }
 
     try {
-      const response = await axios.get(
-        `${COINGECKO_API}/crypto/price/${crypto}`
-      );
-
-      const cryptoId = crypto.toLowerCase();
-      if (!response.data[cryptoId]) {
-        throw new Error(`No price data found for ${crypto}`);
-      }
+      // Updated endpoint
+      const response = await axios.get(`${COINGECKO_API}/simple/price`, {
+        params: {
+          ids: crypto,
+          vs_currencies: 'usd',
+          include_24h_change: true
+        }
+      });
 
       const data = {
-        price: response.data[cryptoId].usd,
-        change24h: response.data[cryptoId].usd_24h_change,
-        timestamp: Date.now(),
+        price: response.data[crypto].usd,
+        change24h: response.data[crypto].usd_24h_change,
+        timestamp: Date.now()
       };
 
       cache.set(cacheKey, { data, timestamp: Date.now() });
       return data;
     } catch (error) {
-      console.error(`API error for ${crypto}:`, error);
-      const cachedData = cache.get(cacheKey);
-      if (cachedData) {
-        console.log(`Using stale cache for ${crypto} price data`);
-        return cachedData.data;
-      }
-      return {
-        price: 0,
-        change24h: 0,
-        timestamp: Date.now(),
-      };
+      console.error('API error:', error);
+      throw error;
     }
   },
 
@@ -139,32 +130,18 @@ export const api = {
     }
 
     try {
+      // Updated endpoint
       const response = await axios.get(`${COINGECKO_API}/coins/${crypto}/market_chart`, {
         params: {
           vs_currency: 'usd',
-          days,
+          days: days.toString(),
           interval: 'daily'
         }
       });
 
-      // Transform data to match expected format
-      const transformedData = {
-        prices: response.data.prices.map((item: [number, number]) => ({
-          timestamp: item[0],
-          price: item[1]
-        })),
-        total_volumes: response.data.total_volumes.map((item: [number, number]) => ({
-          timestamp: item[0],
-          value: item[1]
-        })),
-        market_caps: response.data.market_caps.map((item: [number, number]) => ({
-          timestamp: item[0],
-          value: item[1]
-        }))
-      };
-
-      cache.set(cacheKey, { data: transformedData, timestamp: Date.now() });
-      return transformedData;
+      const data = response.data;
+      cache.set(cacheKey, { data, timestamp: Date.now() });
+      return data;
     } catch (error) {
       console.error('Error fetching historical data:', error);
       throw error;
@@ -679,6 +656,7 @@ export const api = {
     }
 
     try {
+      // Updated endpoint
       const response = await axios.get(`${COINGECKO_API}/simple/price`, {
         params: {
           ids: coins.join(','),
@@ -693,9 +671,9 @@ export const api = {
       Object.entries(response.data).forEach(([id, data]: [string, any]) => {
         batchData[id] = {
           price: data.usd,
-          change24h: data.usd_24h_change,
+          change24h: data.usd_24h_change || 0,
           timestamp: Date.now(),
-          marketCap: data.usd_market_cap
+          marketCap: data.usd_market_cap || 0
         };
       });
 
@@ -761,4 +739,4 @@ export const api = {
       throw error;
     }
   }
-};  
+}; 
