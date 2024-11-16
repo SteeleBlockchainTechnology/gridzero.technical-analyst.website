@@ -25,6 +25,18 @@ const isValidCache = (key: string, type: keyof typeof CACHE_DURATION) => {
   return cached && (Date.now() - cached.timestamp < CACHE_DURATION[type]);
 };
 
+interface HistoricalDataItem {
+  timestamp: number;
+  price: number;
+  value?: number;
+}
+
+interface HistoricalData {
+  prices: HistoricalDataItem[];
+  total_volumes: HistoricalDataItem[];
+  market_caps: HistoricalDataItem[];
+}
+
 export const api = {
   async getPrice(crypto: string): Promise<CryptoPrice> {
     const cacheKey = `price-${crypto}`;
@@ -39,7 +51,8 @@ export const api = {
         params: {
           ids: crypto,
           vs_currencies: 'usd',
-          include_24h_change: true
+          include_24h_change: true,
+          include_market_cap: true
         }
       });
 
@@ -49,7 +62,7 @@ export const api = {
 
       const data = {
         price: response.data[crypto].usd,
-        change24h: response.data[crypto].usd_24h_change,
+        change24h: response.data[crypto].usd_24h_change || 0,
         timestamp: Date.now(),
       };
 
@@ -69,7 +82,7 @@ export const api = {
     }
   },
 
-  async getHistoricalData(crypto: string, days: number = 200) {
+  async getHistoricalData(crypto: string, days: number = 200): Promise<HistoricalData> {
     const cacheKey = `historical-${crypto}-${days}`;
     
     if (isValidCache(cacheKey, 'HISTORICAL')) {
@@ -81,12 +94,12 @@ export const api = {
         headers,
         params: {
           vs_currency: 'usd',
-          days,
+          days: days.toString(),
           interval: 'daily'
         }
       });
 
-      const transformedData = {
+      const transformedData: HistoricalData = {
         prices: response.data.prices.map((item: [number, number]) => ({
           timestamp: item[0],
           price: item[1]
@@ -110,6 +123,45 @@ export const api = {
         return cachedData.data;
       }
       throw error;
+    }
+  },
+
+  async getNews(crypto: string): Promise<{ news: NewsItem[] }> {
+    const cacheKey = `news-${crypto}`;
+    
+    if (isValidCache(cacheKey, 'NEWS')) {
+      return cache.get(cacheKey)!.data;
+    }
+
+    try {
+      const response = await axios.get(`${COINGECKO_API}/coins/${crypto}`, {
+        headers,
+        params: {
+          localization: false,
+          tickers: false,
+          market_data: false,
+          community_data: false,
+          developer_data: false,
+          sparkline: false
+        }
+      });
+
+      const news: NewsItem[] = [{
+        title: `Latest update for ${response.data.name}`,
+        source: 'CoinGecko',
+        url: response.data.links?.homepage?.[0] || '#',
+        timestamp: Date.now(),
+        sentiment: 'neutral',
+        description: response.data.description?.en || 'No description available',
+        aiTags: response.data.categories || []
+      }];
+
+      const data = { news };
+      cache.set(cacheKey, { data, timestamp: Date.now() });
+      return data;
+    } catch (error) {
+      console.error('Error fetching news:', error);
+      return { news: [] };
     }
   },
 
@@ -154,58 +206,6 @@ export const api = {
     }
   },
 
-  // Add error handling and retries
-  async handleRequest<T>(request: () => Promise<T>, retries = 3): Promise<T> {
-    try {
-      return await request();
-    } catch (error: any) {
-      if (error.response?.status === 429 && retries > 0) {
-        // Rate limited, wait and retry
-        await new Promise(resolve => setTimeout(resolve, 30000));
-        return this.handleRequest(request, retries - 1);
-      }
-      throw error;
-    }
-  },
-
-  async getNews(crypto: string): Promise<{ news: NewsItem[] }> {
-    const cacheKey = `news-${crypto}`;
-    
-    if (isValidCache(cacheKey, 'NEWS')) {
-      return cache.get(cacheKey)!.data;
-    }
-
-    try {
-      // Use CoinGecko's news endpoint
-      const response = await axios.get(`${COINGECKO_API}/coins/${crypto}/status_updates`, {
-        headers,
-        params: {
-          per_page: 20,
-          category: 'general'
-        }
-      });
-
-      // Transform CoinGecko's response to match our NewsItem format
-      const news: NewsItem[] = response.data.status_updates.map((item: any) => ({
-        title: item.description,
-        source: 'CoinGecko',
-        url: item.project.links?.homepage?.[0] || '#',
-        timestamp: new Date(item.created_at).getTime(),
-        sentiment: 'neutral', // Default sentiment
-        description: item.description,
-        aiTags: item.tags || []
-      }));
-
-      const data = { news };
-      cache.set(cacheKey, { data, timestamp: Date.now() });
-      return data;
-    } catch (error) {
-      console.error('Error fetching news:', error);
-      // Return empty news array if error
-      return { news: [] };
-    }
-  },
-
   async getPredictions(crypto: string): Promise<PredictionData[]> {
     const cacheKey = `predictions-${crypto}`;
     
@@ -214,20 +214,10 @@ export const api = {
     }
 
     try {
-      // Get price data for predictions
-      const response = await axios.get(`${COINGECKO_API}/coins/${crypto}/market_chart`, {
-        headers,
-        params: {
-          vs_currency: 'usd',
-          days: 30,
-          interval: 'daily'
-        }
-      });
-
-      const prices = response.data.prices.map((item: [number, number]) => item[1]);
+      const response = await this.getHistoricalData(crypto, 30);
+      const prices = response.prices.map((item: HistoricalDataItem) => item.price);
       const currentPrice = prices[prices.length - 1];
 
-      // Calculate simple predictions based on historical data
       const volatility = this.calculateVolatility(prices);
       const trend = this.calculateTrend(prices);
 
