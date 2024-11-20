@@ -31,13 +31,6 @@ export const TradingView: React.FC<TradingViewProps> = ({ crypto, timeframe, pri
         'polkadot': 'DOTUSDT',
         'injective-protocol': 'INJUSDT',
         'render-token': 'RENDERUSDT',
-        // Add more special cases
-        'chainlink': 'LINKUSDT',
-        'avalanche-2': 'AVAXUSDT',
-        'matic-network': 'MATICUSDT',
-        'ripple': 'XRPUSDT',
-        'dogecoin': 'DOGEUSDT',
-        'uniswap': 'UNIUSDT',
       };
 
       // Use mapped symbol if available, otherwise construct it
@@ -51,59 +44,12 @@ export const TradingView: React.FC<TradingViewProps> = ({ crypto, timeframe, pri
       // Clear previous content
       container.current.innerHTML = '';
 
-      const script = document.createElement('script');
-      script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-      script.type = 'text/javascript';
-      script.async = true;
-
-      const config = {
-        "width": "100%",
-        "height": "600",
-        "symbol": getSymbol(crypto),
-        "interval": intervalMap[timeframe] || "D",
-        "timezone": "exchange",
-        "theme": "dark",
-        "style": "1",
-        "locale": "en",
-        "enable_publishing": false,
-        "backgroundColor": "rgba(0, 0, 0, 0.1)",
-        "gridColor": "rgba(255, 255, 255, 0.06)",
-        "hide_top_toolbar": false,
-        "hide_legend": false,
-        "save_image": false,
-        "hide_volume": false,
-        "support_host": "https://www.tradingview.com",
-        "allow_symbol_change": true,
-        "studies": [
-          "MASimple@tv-basicstudies",
-          "RSI@tv-basicstudies",
-          "MACD@tv-basicstudies"
-        ],
-        "show_popup_button": false,
-        "popup_width": "1000",
-        "popup_height": "650",
-        "container_id": `tradingview_${crypto}_${Date.now()}`,
-        // Add current price overlay
-        "overrides": {
-          "paneProperties.background": "rgba(0, 0, 0, 0.1)",
-          "paneProperties.vertGridProperties.color": "rgba(255, 255, 255, 0.06)",
-          "paneProperties.horzGridProperties.color": "rgba(255, 255, 255, 0.06)",
-          "scalesProperties.textColor": "#AAA",
-          "mainSeriesProperties.priceLineColor": price.change24h >= 0 ? "#26a69a" : "#ef5350",
-          "mainSeriesProperties.priceLineWidth": 2,
-          "mainSeriesProperties.showPriceLine": true,
-        }
-      };
-
-      script.innerHTML = JSON.stringify(config);
-
-      // Create widget container
       const widgetContainer = document.createElement('div');
       widgetContainer.className = 'tradingview-widget-container relative';
       
-      // Add current price overlay
+      // Add price overlay
       const priceOverlay = document.createElement('div');
-      priceOverlay.className = 'absolute top-4 right-4 bg-black/50 backdrop-blur-sm rounded-lg p-2 text-sm';
+      priceOverlay.className = 'absolute top-4 right-4 bg-black/50 backdrop-blur-sm rounded-lg p-2 text-sm z-10';
       priceOverlay.innerHTML = `
         <div class="flex items-center gap-2">
           <span class="text-white font-medium">$${price.price.toLocaleString()}</span>
@@ -112,19 +58,81 @@ export const TradingView: React.FC<TradingViewProps> = ({ crypto, timeframe, pri
           </span>
         </div>
       `;
-      
       widgetContainer.appendChild(priceOverlay);
+      
+      const widget = document.createElement('div');
+      const widgetId = `tradingview_${crypto}_${Date.now()}`;
+      widget.id = widgetId;
+      
+      widgetContainer.appendChild(widget);
       container.current.appendChild(widgetContainer);
-      widgetContainer.appendChild(script);
+
+      const script = document.createElement('script');
+      script.src = 'https://s3.tradingview.com/tv.js';
+      script.async = true;
+      script.onload = () => {
+        if (typeof TradingView !== 'undefined') {
+          new (window as any).TradingView.widget({
+            autosize: true,
+            symbol: getSymbol(crypto),
+            interval: intervalMap[timeframe] || 'D',
+            container_id: widgetId,
+            theme: 'dark',
+            style: '1',
+            locale: 'en',
+            toolbar_bg: '#f1f3f6',
+            enable_publishing: false,
+            allow_symbol_change: true,
+            save_image: false,
+            studies: [
+              'MASimple@tv-basicstudies',
+              'RSI@tv-basicstudies',
+              'MACD@tv-basicstudies'
+            ],
+            width: '100%',
+            height: '600',
+            hide_side_toolbar: false,
+            withdateranges: true,
+            hide_volume: false,
+            details: true,
+            hotlist: true,
+            calendar: true,
+            show_popup_button: false,
+            popup_width: '1000',
+            popup_height: '650',
+            disabled_features: [
+              'header_symbol_search',
+              'header_settings',
+              'header_compare',
+              'header_undo_redo',
+              'header_screenshot',
+              'header_saveload'
+            ],
+            enabled_features: [
+              'hide_left_toolbar_by_default',
+              'use_localstorage_for_settings'
+            ],
+            overrides: {
+              'mainSeriesProperties.candleStyle.upColor': '#26a69a',
+              'mainSeriesProperties.candleStyle.downColor': '#ef5350',
+              'mainSeriesProperties.candleStyle.borderUpColor': '#26a69a',
+              'mainSeriesProperties.candleStyle.borderDownColor': '#ef5350',
+              'mainSeriesProperties.candleStyle.wickUpColor': '#26a69a',
+              'mainSeriesProperties.candleStyle.wickDownColor': '#ef5350'
+            }
+          });
+        }
+      };
+
+      document.head.appendChild(script);
     }
 
-    // Cleanup
     return () => {
       if (container.current) {
         container.current.innerHTML = '';
       }
     };
-  }, [crypto, timeframe, price]); // Add price to dependency array
+  }, [crypto, timeframe, price]);
 
   return (
     <div 
