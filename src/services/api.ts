@@ -130,7 +130,6 @@ export const api = {
     }
 
     try {
-      // Updated endpoint
       const response = await axios.get(`${COINGECKO_API}/coins/${crypto}/market_chart`, {
         params: {
           vs_currency: 'usd',
@@ -139,13 +138,29 @@ export const api = {
         }
       });
 
-      const data = response.data;
-      cache.set(cacheKey, { data, timestamp: Date.now() });
-      return data;
+      // Transform the data into a consistent format
+      const transformedData = {
+        prices: response.data.prices.map((item: [number, number]) => item[1]),
+        volumes: response.data.total_volumes.map((item: [number, number]) => item[1]),
+        timestamps: response.data.prices.map((item: [number, number]) => item[0]),
+        current_price: response.data.prices[response.data.prices.length - 1][1],
+        market_cap: response.data.market_caps[response.data.market_caps.length - 1][1],
+        price_change_24h: this.calculate24hChange(response.data.prices)
+      };
+
+      cache.set(cacheKey, { data: transformedData, timestamp: Date.now() });
+      return transformedData;
     } catch (error) {
       console.error('Error fetching historical data:', error);
       throw error;
     }
+  },
+
+  calculate24hChange(prices: [number, number][]): number {
+    if (prices.length < 2) return 0;
+    const currentPrice = prices[prices.length - 1][1];
+    const yesterdayPrice = prices[prices.length - 2][1];
+    return ((currentPrice - yesterdayPrice) / yesterdayPrice) * 100;
   },
 
   async getSentiment(crypto: string): Promise<SentimentData[]> {

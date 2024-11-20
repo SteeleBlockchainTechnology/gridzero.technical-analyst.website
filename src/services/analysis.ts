@@ -1,5 +1,4 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import axios from 'axios';
 import { api } from "./api";
 
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
@@ -68,34 +67,10 @@ class AnalysisService {
   private async getHistoricalData(crypto: string, days: number = 200) {
     try {
       console.log(`Fetching historical data for ${crypto}...`);
-      const response = await axios.get(
-        `https://crypto-sensei.vercel.app/:3001/api/crypto/history/${crypto}`, {
-          params: {
-            days: days,
-            interval: 'daily'
-          }
-        }
-      );
-      console.log('Historical data response:', response.data);
+      const historicalData = await api.getHistoricalData(crypto, days);
+      console.log('Historical data response:', historicalData);
       
-      if (response.data && Array.isArray(response.data.prices)) {
-        const sortedPrices = response.data.prices.sort((a: any, b: any) => 
-          new Date(a.date).getTime() - new Date(b.date).getTime()
-        );
-        const sortedVolumes = response.data.total_volumes.sort((a: any, b: any) => 
-          new Date(a.date).getTime() - new Date(b.date).getTime()
-        );
-        
-        return {
-          prices: sortedPrices.map((item: any) => item.price),
-          volumes: sortedVolumes.map((item: any) => item.value),
-          current_price: response.data.current_price,
-          market_cap: response.data.market_cap,
-          price_change_24h: response.data.price_change_24h
-        };
-      }
-      
-      throw new Error('Invalid data format from API');
+      return historicalData;
     } catch (error) {
       console.error('Error fetching historical data:', error);
       throw error;

@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { api } from './api'; // Import the api service
 
 type WebSocketCallback = (data: any) => void;
 
@@ -11,6 +11,9 @@ class WebSocketService {
   private isConnecting = false;
   private currentCrypto: string = 'bitcoin';
   private heartbeatInterval: NodeJS.Timeout | null = null;
+  private pricePollingInterval: NodeJS.Timeout | null = null;
+  private lastPriceUpdate: number = 0;
+  private PRICE_UPDATE_THRESHOLD = 10000; // 10 seconds
 
   async connect() {
     if (this.isConnecting || this.ws?.readyState === WebSocket.OPEN) return;
@@ -92,13 +95,19 @@ class WebSocketService {
     const pollPrice = async () => {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
         try {
-          const response = await axios.get(`https://crypto-sensei.vercel.app:3001/api/crypto/price/${this.currentCrypto}`);
-          if (response.data && response.data[this.currentCrypto]) {
+          // Check if we need a new price update
+          const now = Date.now();
+          if (now - this.lastPriceUpdate > this.PRICE_UPDATE_THRESHOLD) {
+            // Get price from the existing API cache if available
+            const priceData = await api.getPrice(this.currentCrypto);
+            
             const price = {
-              price: parseFloat(response.data[this.currentCrypto].usd),
-              change24h: parseFloat(response.data[this.currentCrypto].usd_24h_change),
-              timestamp: Date.now()
+              price: priceData.price,
+              change24h: priceData.change24h,
+              timestamp: now
             };
+            
+            this.lastPriceUpdate = now;
             this.notifySubscribers([price]);
           }
         } catch (error) {
@@ -107,9 +116,10 @@ class WebSocketService {
       }
     };
 
-    // Poll immediately and then every 5 seconds
+    // Poll every 10 seconds if WebSocket is not available
+    this.pricePollingInterval = setInterval(pollPrice, 10000);
+    // Initial poll
     pollPrice();
-    return setInterval(pollPrice, 5000);
   }
 
   private handleReconnect() {
@@ -153,6 +163,11 @@ class WebSocketService {
     }
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+    if (this.pricePollingInterval) {
+      clearInterval(this.pricePollingInterval);
+      this.pricePollingInterval = null;
     }
     this.isConnecting = false;
     this.reconnectAttempts = 0;
