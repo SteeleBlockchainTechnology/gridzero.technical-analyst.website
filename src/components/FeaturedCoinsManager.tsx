@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FeaturedCoin } from '../services/types';
 import { Switch } from './ui/switch'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Search, GripVertical, Plus, Trash2, TrendingUp, BarChart2 } from 'lucide-react';
+import { Search, GripVertical, Plus, Trash2, TrendingUp, BarChart2, X } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Input } from './ui/input'
 import { Button } from './ui/button';
@@ -35,7 +35,7 @@ export const FeaturedCoinsManager: React.FC<FeaturedCoinsManagerProps> = ({
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [coinMetadata, setCoinMetadata] = useState<Record<string, CoinMetadata>>({});
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
   const activeCoinsCount = coins.filter(coin => coin.isActive).length;
   const MAX_ACTIVE_COINS = 5;
@@ -75,6 +75,14 @@ export const FeaturedCoinsManager: React.FC<FeaturedCoinsManagerProps> = ({
     }
   };
 
+  const toggleSearch = () => {
+    setIsSearching(!isSearching);
+    if (!isSearching) {
+      setSearchTerm('');
+      setSearchResults([]);
+    }
+  };
+
   const handleSearch = async (value: string) => {
     setSearchTerm(value);
     if (value.length < 2) {
@@ -82,7 +90,6 @@ export const FeaturedCoinsManager: React.FC<FeaturedCoinsManagerProps> = ({
       return;
     }
 
-    setIsSearching(true);
     try {
       const results = await featuredCoinsService.searchCoins(value);
       const filteredResults = results.filter(
@@ -91,8 +98,6 @@ export const FeaturedCoinsManager: React.FC<FeaturedCoinsManagerProps> = ({
       setSearchResults(filteredResults);
     } catch (error) {
       console.error('Error searching coins:', error);
-    } finally {
-      setIsSearching(false);
     }
   };
 
@@ -100,6 +105,7 @@ export const FeaturedCoinsManager: React.FC<FeaturedCoinsManagerProps> = ({
     onAddCoin(coin);
     setSearchTerm('');
     setSearchResults([]);
+    setIsSearching(false);
   };
 
   const handleDragEnd = (result: any) => {
@@ -111,6 +117,17 @@ export const FeaturedCoinsManager: React.FC<FeaturedCoinsManagerProps> = ({
 
     onReorderCoins(items);
   };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setIsSearching(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <Card className="bg-black/30 backdrop-blur-lg border-none">
@@ -125,10 +142,10 @@ export const FeaturedCoinsManager: React.FC<FeaturedCoinsManagerProps> = ({
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setIsSearching(!isSearching)}
+            onClick={toggleSearch}
             className="text-blue-400 hover:text-blue-300"
           >
-            <Plus className="h-5 w-5" />
+            {isSearching ? <X className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
           </Button>
         </div>
       </CardHeader>
@@ -153,19 +170,8 @@ export const FeaturedCoinsManager: React.FC<FeaturedCoinsManagerProps> = ({
               className="mb-4"
             >
               <div 
+                ref={searchContainerRef}
                 className="relative"
-                onFocus={() => setIsSearchFocused(true)}
-                onBlur={(e) => {
-                  // Check if the related target is within the search results
-                  const searchContainer = e.currentTarget;
-                  const relatedTarget = e.relatedTarget as Node;
-                  
-                  if (!searchContainer.contains(relatedTarget)) {
-                    setTimeout(() => {
-                      setIsSearchFocused(false);
-                    }, 200);
-                  }
-                }}
               >
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                 <Input
@@ -175,7 +181,7 @@ export const FeaturedCoinsManager: React.FC<FeaturedCoinsManagerProps> = ({
                   className="pl-10 bg-slate-800/50 border-slate-700"
                   autoFocus
                 />
-                {searchResults.length > 0 && isSearchFocused && (
+                {searchResults.length > 0 && (
                   <div
                     className="absolute w-full mt-2 bg-slate-800 rounded-lg shadow-lg z-10 max-h-[300px] overflow-y-auto"
                   >
@@ -183,7 +189,7 @@ export const FeaturedCoinsManager: React.FC<FeaturedCoinsManagerProps> = ({
                       <button
                         key={result.id}
                         onMouseDown={(e) => {
-                          e.preventDefault(); // Prevent input blur
+                          e.preventDefault();
                           handleAddCoin(result);
                         }}
                         className="w-full px-4 py-2 text-left hover:bg-slate-700 text-sm text-slate-200 flex items-center justify-between"

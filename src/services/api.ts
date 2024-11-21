@@ -201,7 +201,7 @@ export const api = {
     }
   },
 
-  async getNews(crypto: string, limit: number = 8): Promise<{ news: NewsItem[] }> {
+  async getNews(crypto: string, limit: number = 10): Promise<{ news: NewsItem[] }> {
     const cacheKey = `news-${crypto}`;
     
     // Check cache first
