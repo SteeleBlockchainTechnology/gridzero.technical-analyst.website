@@ -25,7 +25,7 @@ export const MarketPhase: React.FC<MarketPhaseProps> = ({ data }) => {
     return (
       <Card className="bg-black/30 backdrop-blur-lg border-none">
         <CardHeader>
-          <CardTitle className="text-xl font-bold text-blue-300 flex items-center gap-2">
+          <CardTitle className="text-lg md:text-xl font-bold text-blue-300 flex items-center gap-2">
             <Activity className="w-5 h-5" />
             Market Phase
           </CardTitle>
@@ -50,14 +50,14 @@ export const MarketPhase: React.FC<MarketPhaseProps> = ({ data }) => {
   return (
     <Card className="bg-black/30 backdrop-blur-lg border-none overflow-hidden">
       <CardHeader>
-        <CardTitle className="text-xl font-bold text-blue-300 flex items-center gap-2">
+        <CardTitle className="text-lg md:text-xl font-bold text-blue-300 flex items-center gap-2">
           <Activity className="w-5 h-5" />
           Market Phase
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-4 md:space-y-6">
         <motion.div 
-          className={`text-3xl font-bold text-center p-4 rounded-lg bg-gradient-to-r ${getPhaseColor(data.phase)}`}
+          className={`text-xl md:text-3xl font-bold text-center p-3 md:p-4 rounded-lg bg-gradient-to-r ${getPhaseColor(data.phase)}`}
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.5 }}
@@ -65,7 +65,7 @@ export const MarketPhase: React.FC<MarketPhaseProps> = ({ data }) => {
           {data.phase}
         </motion.div>
         <div className="space-y-2">
-          <div className="flex justify-between text-sm text-slate-300">
+          <div className="flex justify-between text-xs md:text-sm text-slate-300">
             <span>Strength</span>
             <span>{(data.strength * 100).toFixed(1)}%</span>
           </div>
@@ -83,19 +83,19 @@ export const MarketPhase: React.FC<MarketPhaseProps> = ({ data }) => {
             />
           </motion.div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2 md:gap-3">
           {Object.entries(data.keyLevels).map(([level, price], index) => (
             <motion.div 
               key={level} 
-              className="bg-slate-800/50 p-3 rounded-lg backdrop-blur-sm"
+              className="bg-slate-800/50 p-2 md:p-3 rounded-lg backdrop-blur-sm"
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.3, delay: index * 0.1 }}
             >
-              <div className="text-xs text-slate-400 mb-1">
+              <div className="text-[10px] md:text-xs text-slate-400 mb-1">
                 {level.replace(/([A-Z])/g, ' $1').trim()}
               </div>
-              <div className="font-medium text-white">
+              <div className="text-sm md:text-base font-medium text-white truncate">
                 ${(price as number).toLocaleString()}
               </div>
             </motion.div>

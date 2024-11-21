@@ -49,36 +49,24 @@ export const AdvancedAnalysis = ({ crypto, predictions }: AdvancedAnalysisProps)
     );
   }
 
-  // Validate required data
-  const isValidData = analysis.marketCondition && 
-                     analysis.technicalSignals && 
-                     analysis.sentimentAnalysis && 
-                     analysis.predictions && 
-                     analysis.riskAnalysis && 
-                     analysis.tradingStrategy;
-
-  if (!isValidData) {
-    return (
-      <div className="p-8 text-center text-yellow-400">
-        <p>Incomplete analysis data. Please try again later.</p>
-      </div>
-    );
-  }
-
-  // Merge predictions from props with analysis predictions
+  // Merge external predictions with analysis predictions
   const mergedPredictions = {
     ...analysis.predictions,
-    externalPredictions: predictions // Add external predictions to the analysis
+    externalPredictions: predictions
   };
 
   return (
-    <div className="grid grid-cols-2 gap-4 text-white">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <MarketPhase data={analysis.marketCondition} />
       <TechnicalSignals data={analysis.technicalSignals} />
       <SentimentOverview data={analysis.sentimentAnalysis} />
-      <PricePredictions data={mergedPredictions} /> {/* Pass merged predictions */}
-      <RiskAnalysis data={analysis.riskAnalysis} />
-      <TradingStrategy data={analysis.tradingStrategy} />
+      <PricePredictions data={mergedPredictions} />
+      <div className="md:col-span-2">
+        <RiskAnalysis data={analysis.riskAnalysis} />
+      </div>
+      <div className="md:col-span-2">
+        <TradingStrategy data={analysis.tradingStrategy} />
+      </div>
     </div>
   );
 }; 
