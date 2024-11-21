@@ -30,10 +30,22 @@ export const NewsPanel: React.FC<NewsPanelProps> = ({ crypto, news }) => {
     );
   });
 
+  // Take up to 10 news items
+  const displayNews = filteredNews.slice(0, 10);
+
+  // Function to truncate description
+  const truncateDescription = (description: string) => {
+    const words = description.split(' ');
+    if (words.length > 30) { // Limit to approximately 3-4 lines
+      return words.slice(0, 30).join(' ') + '...';
+    }
+    return description;
+  };
+
   return (
     <div className="space-y-4">
-      {filteredNews.length > 0 ? (
-        filteredNews.map((item, index) => (
+      {displayNews.length > 0 ? (
+        displayNews.map((item, index) => (
           <a
             key={index}
             href={item.url}
@@ -63,7 +75,7 @@ export const NewsPanel: React.FC<NewsPanelProps> = ({ crypto, news }) => {
               
               {item.description && (
                 <p className="text-sm text-gray-300">
-                  {item.description}
+                  {truncateDescription(item.description)}
                 </p>
               )}
 

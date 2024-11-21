@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Target, ArrowRight } from 'lucide-react'
+import { Target, ArrowRight, Crosshair } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { TradingStrategy as TradingStrategyType } from '../../services/types'
@@ -30,40 +30,34 @@ export const TradingStrategy: React.FC<TradingStrategyProps> = ({ data }) => {
   const formatPrice = (price: number | undefined) => 
     `$${(price || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
 
+  const recommendationParts = data.recommendation.split('(');
+  const recommendation = recommendationParts[0].trim();
+
+  const getRecommendationColor = (rec: string) => {
+    switch (rec.toLowerCase()) {
+      case 'buy': return 'from-green-400 to-green-600';
+      case 'sell': return 'from-red-400 to-red-600';
+      case 'hold': return 'from-yellow-400 to-yellow-600';
+      default: return 'from-blue-400 to-blue-600';
+    }
+  };
+
   return (
     <Card className="bg-black/30 backdrop-blur-lg border-none">
       <CardHeader>
-        <CardTitle className="text-xl font-bold text-blue-300 flex items-center gap-2">
-          <Target className="w-5 h-5" />
+        <CardTitle className="text-lg md:text-xl font-bold text-blue-300 flex items-center gap-2">
+          <Crosshair className="w-5 h-5" />
           Trading Strategy
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Recommendation */}
+      <CardContent className="space-y-4">
         <motion.div 
-          className="bg-slate-800/50 p-4 rounded-lg backdrop-blur-sm"
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
+          className={`text-xl md:text-3xl font-bold text-center p-3 md:p-4 rounded-lg bg-gradient-to-r ${getRecommendationColor(recommendation)}`}
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.5 }}
         >
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm text-slate-300">Recommendation</span>
-            <motion.div 
-              className={`px-3 py-1.5 rounded-full text-sm font-medium ${
-                data.recommendation.includes('Buy') ? 'bg-green-500/20 text-green-400' :
-                data.recommendation.includes('Sell') ? 'bg-red-500/20 text-red-400' :
-                'bg-yellow-500/20 text-yellow-400'
-              }`}
-              initial={{ scale: 0.8 }}
-              animate={{ scale: 1 }}
-              transition={{ duration: 0.2, delay: 0.5 }}
-            >
-              {`${data.recommendation} (${data.confidence}%)`}
-            </motion.div>
-          </div>
-          <div className="text-xs text-slate-400">
-            Timeframe: {data.timeframe}
-          </div>
+          {recommendation} ({data.confidence}%)
         </motion.div>
 
         {/* Entry Points */}

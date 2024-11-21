@@ -131,11 +131,11 @@ export const FeaturedCoinsManager: React.FC<FeaturedCoinsManagerProps> = ({
 
   return (
     <Card className="bg-black/30 backdrop-blur-lg border-none">
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
         <CardTitle className="text-xl font-bold text-blue-300">
           Featured Coins
         </CardTitle>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <span className="text-sm text-slate-400">
             {activeCoinsCount}/{MAX_ACTIVE_COINS} Active
           </span>
@@ -225,25 +225,25 @@ export const FeaturedCoinsManager: React.FC<FeaturedCoinsManagerProps> = ({
                         transition={{ delay: index * 0.1 }}
                         className="bg-slate-800/50 p-3 rounded-lg backdrop-blur-sm"
                       >
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-2">
                           {/* Drag Handle */}
                           <div {...provided.dragHandleProps} className="px-2">
                             <GripVertical className="h-4 w-4 text-slate-400" />
                           </div>
 
                           {/* Coin Info */}
-                          <div className="flex-1 px-2">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-white">
+                          <div className="flex-1 px-2 min-w-0">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                              <span className="text-sm font-medium text-white truncate">
                                 {coin.name} ({coin.symbol})
                               </span>
                               {coinMetadata[coin.id] && (
                                 <div className="flex items-center gap-2 text-xs text-slate-400">
-                                  <span className="flex items-center">
+                                  <span className="flex items-center whitespace-nowrap">
                                     <TrendingUp className="h-3 w-3 mr-1" />
                                     ${coinMetadata[coin.id].price.toLocaleString()}
                                   </span>
-                                  <span className="flex items-center">
+                                  <span className="flex items-center whitespace-nowrap">
                                     <BarChart2 className="h-3 w-3 mr-1" />
                                     ${coinMetadata[coin.id].marketCap.toLocaleString()}
                                   </span>
@@ -253,7 +253,7 @@ export const FeaturedCoinsManager: React.FC<FeaturedCoinsManagerProps> = ({
                           </div>
 
                           {/* Controls */}
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 ml-auto">
                             <Switch
                               checked={coin.isActive}
                               onCheckedChange={() => handleToggle(coin.id)}
