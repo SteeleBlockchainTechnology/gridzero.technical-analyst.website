@@ -2,6 +2,8 @@
 
 A complete real-time cryptocurrency analysis platform that combines technical analysis, sentiment analysis, trading volume data, news trends, and AI-powered predictions to provide comprehensive market insights and trading recommendations.
 
+## Try Out Here: https://crypto-sensei.vercel.app/
+(Note: You may hit the rate limit, as this is using Coingeko free API.)
 ## Table of Contents
 1. [Overview](#overview)
 2. [Features](#features)
