@@ -1,7 +1,7 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { api } from "./api";
 
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API);
+const genAI = new GoogleGenAI({apiKey: import.meta.env.VITE_GEMINI_API});
 
 interface TechnicalIndicators {
   currentPrice: number;
@@ -282,16 +282,12 @@ class AnalysisService {
     ) * Math.sqrt(365) * 100;
   }
 
-
-
   private async getAIAnalysis(
     crypto: string,
     technicalIndicators: TechnicalIndicators,
     news: any[],
     sentiment: any
   ): Promise<string> {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-
     const prompt = `
       Act as an expert quantitative analyst and cryptocurrency trader. Analyze the following comprehensive market data for ${crypto} and provide a detailed strategic analysis:
 
@@ -373,8 +369,17 @@ class AnalysisService {
       Remove any markdown formatting and ensure all price levels are properly formatted with $ symbol.
     `;
 
-    const result = await model.generateContent(prompt);
-    return result.response.text();
+    const result = await genAI.models.generateContent({
+      model: "gemini-2.5-flash-preview-04-17",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: {
+        thinkingConfig: {
+          thinkingBudget: 0,
+        },
+      },
+    });
+
+    return result.text ?? "";
   }
 
   private interpretRSI(rsi: number): string {
@@ -445,7 +450,6 @@ class AnalysisService {
     // Ensure confidence is between 30 and 95
     return Math.min(95, Math.max(30, weightedConfidence));
   }
-
 
   async getDetailedAnalysis(crypto: string): Promise<DetailedAnalysis> {
     try {
@@ -537,8 +541,6 @@ class AnalysisService {
         }
       ];
 
- 
-
       // Generate AI analysis
       const aiAnalysis = await this.getAIAnalysis(
         crypto,
@@ -549,8 +551,6 @@ class AnalysisService {
 
       // Parse AI analysis
       const parsedAnalysis = this.parseAIAnalysis(aiAnalysis);
-
-   
 
       // Calculate confidence for each timeframe
       const shortTermConfidence = this.calculateConfidence(rsi, macd, volumeRatio, sentiment, volatilityIndex);
@@ -696,8 +696,6 @@ class AnalysisService {
     return sections;
   }
 
- 
-
   async getFullAnalysis(crypto: string): Promise<DetailedAnalysis> {
     try {
       // Fetch historical data
@@ -742,7 +740,7 @@ class AnalysisService {
         }
       };
 
-           // Generate signals based on all indicators
+      // Generate signals based on all indicators
       const signals = [
         {
           indicator: 'RSI',
@@ -769,7 +767,6 @@ class AnalysisService {
           strength: volumeRatio - 1
         }
       ];
-
 
       // Generate AI analysis
       const technicalIndicators: TechnicalIndicators = {
@@ -799,8 +796,6 @@ class AnalysisService {
         sentiment
       );
 
-
-
       // Updated market summary with date-based formatting and current trend lines
       const latestDateIndex = prices.length - 1;
       const latestPrice = prices[latestDateIndex];
@@ -821,7 +816,6 @@ class AnalysisService {
         stochRSI
       });
       const baseConfidence = parseFloat((85 - volatility / 2).toFixed(2));
-
 
       return {
         summary: marketSummary,
