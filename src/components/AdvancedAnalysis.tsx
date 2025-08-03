@@ -5,8 +5,8 @@ import { SentimentOverview } from './analysis/SentimentOverview';
 import { PricePredictions } from './analysis/PricePredictions';
 import { RiskAnalysis } from './analysis/RiskAnalysis';
 import { TradingStrategy } from './analysis/TradingStrategy';
-import { Loader2 } from 'lucide-react';
 import { PredictionData } from '@/services/types';
+import { LoadingSpinner, ErrorDisplay } from './ErrorBoundary';
 
 interface AdvancedAnalysisProps {
   crypto: string;
@@ -14,31 +14,14 @@ interface AdvancedAnalysisProps {
 }
 
 export const AdvancedAnalysis = ({ crypto, predictions }: AdvancedAnalysisProps) => {
-  const { analysis, loading, error } = useAdvancedAnalysis(crypto);
+  const { analysis, loading, error, refetch } = useAdvancedAnalysis(crypto);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8 text-white">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-green-500" />
-          <p>Loading advanced analysis...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner message="Loading advanced analysis..." />;
   }
 
   if (error) {
-    return (
-      <div className="p-8 text-center text-red-400">
-        <p>Error loading analysis: {error}</p>
-        <button 
-          onClick={() => window.location.reload()}
-          className="mt-4 px-4 py-2 bg-slate-700 rounded-lg hover:bg-slate-600 transition-colors"
-        >
-          Retry
-        </button>
-      </div>
-    );
+    return <ErrorDisplay error={error} onRetry={refetch} />;
   }
 
   if (!analysis) {

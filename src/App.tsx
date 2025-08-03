@@ -6,6 +6,7 @@ import { NewsPanel } from './components/NewsPanel'
 import { TradingView } from './components/TradingView'
 import { MarketAnalysis } from './components/MarketAnalysis'
 import { AdvancedAnalysis } from './components/AdvancedAnalysis'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { api } from './services/api'
 import type { NewsItem, PredictionData, CryptoPrice, FeaturedCoin } from './services/types'
 import { Coins, Clock} from 'lucide-react'
@@ -142,11 +143,13 @@ export default function App() {
               >
                 <Card className="overflow-hidden border-none text-white/60 bg-black/30 backdrop-blur-lg">
                   <CardContent className="p-0">
-                    <TradingView 
-                      crypto={crypto} 
-                      timeframe={timeframe}
-                      price={price}
-                    />
+                    <ErrorBoundary>
+                      <TradingView 
+                        crypto={crypto} 
+                        timeframe={timeframe}
+                        price={price}
+                      />
+                    </ErrorBoundary>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -164,10 +167,12 @@ export default function App() {
                     <CardTitle className="text-xl font-bold text-green-300">Market Analysis</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <MarketAnalysis 
-                      crypto={crypto} 
-                      predictions={predictions}
-                    />
+                    <ErrorBoundary>
+                      <MarketAnalysis 
+                        crypto={crypto} 
+                        predictions={predictions}
+                      />
+                    </ErrorBoundary>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -185,10 +190,12 @@ export default function App() {
                     <CardTitle className="text-xl font-bold text-green-300">Advanced Analysis</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <AdvancedAnalysis 
-                      crypto={crypto} 
-                      predictions={predictions}
-                    />
+                    <ErrorBoundary>
+                      <AdvancedAnalysis 
+                        crypto={crypto} 
+                        predictions={predictions}
+                      />
+                    </ErrorBoundary>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -235,7 +242,9 @@ export default function App() {
                     <CardTitle className="text-xl font-bold text-green-300">Latest News</CardTitle>
                   </CardHeader>
                   <CardContent className="p-4">
-                    <NewsPanel crypto={crypto} news={news} />
+                    <ErrorBoundary>
+                      <NewsPanel crypto={crypto} news={news} />
+                    </ErrorBoundary>
                   </CardContent>
                 </Card>
               </motion.div>

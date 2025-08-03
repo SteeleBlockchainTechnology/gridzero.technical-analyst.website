@@ -3,6 +3,7 @@ import { Brain, TrendingUp, TrendingDown, Activity, Target, AlertTriangle, Clock
 import { analysisService } from '../services/analysis';
 import { motion } from 'framer-motion';
 import { PredictionData } from '@/services/types';
+import { ErrorDisplay } from './ErrorBoundary';
 
 interface MarketAnalysisProps {
   crypto: string;
@@ -166,54 +167,54 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto, predicti
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchAnalysis = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const result = await analysisService.getDetailedAnalysis(crypto);
-        if (!result) {
-          throw new Error('No analysis data available');
-        }
-
-        // Merge external predictions with analysis data
-        const mergedAnalysis = {
-          ...result,
-          priceTargets: {
-            ...result.priceTargets,
-            externalPredictions: predictions
-          }
-        };
-
-        setAnalysis(mergedAnalysis);
-      } catch (err) {
-        console.error('Error in MarketAnalysis:', err);
-        setError('Failed to fetch market analysis');
-        setAnalysis({
-          summary: 'Market analysis unavailable',
-          aiAnalysis: 'AI analysis unavailable',
-          priceTargets: {
-            '24H': { range: 'N/A', confidence: '0' },
-            '7D': { range: 'N/A', confidence: '0' },
-            '30D': { range: 'N/A', confidence: '0' },
-            externalPredictions: predictions
-          },
-          signals: [],
-          strategy: {
-            position: 'Neutral',
-            entry: 'N/A',
-            stop: 'N/A',
-            target: 'N/A'
-          },
-          marketStructure: {
-            trend: 'Neutral'
-          }
-        });
-      } finally {
-        setLoading(false);
+  const fetchAnalysis = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await analysisService.getDetailedAnalysis(crypto);
+      if (!result) {
+        throw new Error('No analysis data available');
       }
-    };
 
+      // Merge external predictions with analysis data
+      const mergedAnalysis = {
+        ...result,
+        priceTargets: {
+          ...result.priceTargets,
+          externalPredictions: predictions
+        }
+      };
+
+      setAnalysis(mergedAnalysis);
+    } catch (err) {
+      console.error('Error in MarketAnalysis:', err);
+      setError('Failed to fetch market analysis');
+      setAnalysis({
+        summary: 'Market analysis unavailable',
+        aiAnalysis: 'AI analysis unavailable',
+        priceTargets: {
+          '24H': { range: 'N/A', confidence: '0' },
+          '7D': { range: 'N/A', confidence: '0' },
+          '30D': { range: 'N/A', confidence: '0' },
+          externalPredictions: predictions
+        },
+        signals: [],
+        strategy: {
+          position: 'Neutral',
+          entry: 'N/A',
+          stop: 'N/A',
+          target: 'N/A'
+        },
+        marketStructure: {
+          trend: 'Neutral'
+        }
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchAnalysis();
   }, [crypto, predictions]); // Only depend on crypto and predictions changes
 
@@ -334,9 +335,11 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto, predicti
   return (
     <div className="space-y-6">
       {error && (
-        <div className="bg-red-500/10 text-red-400 p-3 rounded-lg mb-4">
-          {error}
-        </div>
+        <ErrorDisplay 
+          error={error} 
+          onRetry={fetchAnalysis}
+          className="mb-4" 
+        />
       )}
 
       {/* Market Summary - only show if there's content */}
