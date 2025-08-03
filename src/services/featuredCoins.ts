@@ -1,13 +1,5 @@
 import { FeaturedCoin } from './types';
 
-const DEFAULT_FEATURED_COINS: FeaturedCoin[] = [
-  { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin', isActive: true },
-  { id: 'ethereum', symbol: 'ETH', name: 'Ethereum', isActive: true },
-  { id: 'binancecoin', symbol: 'BNB', name: 'BNB', isActive: true },
-  { id: 'cardano', symbol: 'ADA', name: 'Cardano', isActive: true },
-  { id: 'solana', symbol: 'SOL', name: 'Solana', isActive: true },
-];
-
 const MAX_ACTIVE_COINS = 5;
 
 class FeaturedCoinsService {
@@ -15,7 +7,7 @@ class FeaturedCoinsService {
   
   getFeaturedCoins(): FeaturedCoin[] {
     const stored = localStorage.getItem(this.STORAGE_KEY);
-    return stored ? JSON.parse(stored) : DEFAULT_FEATURED_COINS;
+    return stored ? JSON.parse(stored) : [];
   }
 
   updateFeaturedCoins(coins: FeaturedCoin[]): void {

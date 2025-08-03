@@ -214,7 +214,16 @@ export const FeaturedCoinsManager: React.FC<FeaturedCoinsManagerProps> = ({
                 ref={provided.innerRef}
                 className="space-y-2"
               >
-                {coins.map((coin, index) => (
+                {coins.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400">
+                    <BarChart2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-lg font-medium mb-2">No Featured Coins</p>
+                    <p className="text-sm">
+                      Search and add coins to analyze assets.
+                    </p>
+                  </div>
+                ) : (
+                  coins.map((coin, index) => (
                   <Draggable key={coin.id} draggableId={coin.id} index={index}>
                     {(provided) => (
                       <motion.div
@@ -268,7 +277,8 @@ export const FeaturedCoinsManager: React.FC<FeaturedCoinsManagerProps> = ({
                       </motion.div>
                     )}
                   </Draggable>
-                ))}
+                  ))
+                )}
                 {provided.placeholder}
               </div>
             )}

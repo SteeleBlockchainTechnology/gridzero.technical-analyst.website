@@ -91,11 +91,17 @@ export default function App() {
                   <SelectValue placeholder="Select Crypto" />
                 </SelectTrigger>
                 <SelectContent>
-                  {activeFeaturedCoins.map(({ id, symbol }) => (
-                    <SelectItem key={id} value={id}>
-                      {symbol}/USD
-                    </SelectItem>
-                  ))}
+                  {activeFeaturedCoins.length > 0 ? (
+                    activeFeaturedCoins.map(({ id, symbol }) => (
+                      <SelectItem key={id} value={id}>
+                        {symbol}/USD
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="p-3 text-center text-slate-400 text-sm">
+                      Add featured coins to get started
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </div>

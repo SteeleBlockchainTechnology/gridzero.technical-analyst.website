@@ -227,15 +227,15 @@ class AnalysisService {
 
       return {
         newsScore: (positiveCount / total) * 100,
-        socialScore: Math.random() * 100, // Placeholder for social score
+        socialScore: 0, // Social sentiment data unavailable
         marketMood: positiveCount > negativeCount ? 'Bullish' : 
                    negativeCount > positiveCount ? 'Bearish' : 'Neutral'
       };
     } catch (error) {
       console.error('Error getting market sentiment:', error);
       return {
-        newsScore: 50,
-        socialScore: 50,
+        newsScore: 0, // News sentiment data unavailable
+        socialScore: 0,
         marketMood: 'Neutral'
       };
     }

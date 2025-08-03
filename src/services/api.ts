@@ -278,7 +278,8 @@ export const api = {
         return { news: cachedNews.data };
       }
       
-      return { news: this.getFallbackNews(crypto) };
+      // Return empty news array when real news is unavailable
+      return { news: [] };
     }
   },
 
@@ -537,43 +538,14 @@ export const api = {
 
     try {
       // Get historical data for predictions
-      const historicalData = await this.getHistoricalData(crypto);
-      const currentPrice = historicalData.current_price;
-
-      // Generate predictions for different timeframes
-      const predictions: PredictionData[] = [
-        {
-          period: 'Short-term',
-          price: currentPrice * (1 + (Math.random() * 0.1 - 0.05)), // ±5%
-          confidence: 75 + Math.random() * 20,
-          timestamp: Date.now()
-        },
-        {
-          period: 'Mid-term',
-          price: currentPrice * (1 + (Math.random() * 0.2 - 0.1)), // ±10%
-          confidence: 65 + Math.random() * 20,
-          timestamp: Date.now()
-        },
-        {
-          period: 'Long-term',
-          price: currentPrice * (1 + (Math.random() * 0.3 - 0.15)), // ±15%
-          confidence: 55 + Math.random() * 20,
-          timestamp: Date.now()
-        }
-      ];
+      // Real prediction data not available - return empty array
+      const predictions: PredictionData[] = [];
 
       cache.set(cacheKey, { data: predictions, timestamp: Date.now() });
       return predictions;
     } catch (error) {
       console.error('Error generating predictions:', error);
-      return [
-        {
-          period: 'Short-term',
-          price: 0,
-          confidence: 0,
-          timestamp: Date.now()
-        }
-      ];
+      return []; // Return empty array when predictions unavailable
     }
   },
 
@@ -608,59 +580,6 @@ export const api = {
       }
       return [];
     }
-  },
-
-  getFallbackNews(crypto: string): NewsItem[] {
-    const currentTime = Date.now();
-    const cryptoName = crypto.charAt(0).toUpperCase() + crypto.slice(1);
-    
-    return [
-      {
-        title: `${cryptoName} Shows Strong Technical Indicators`,
-        description: `Recent market analysis shows ${cryptoName} maintaining strong technical indicators with key support levels holding. Market sentiment remains positive as institutional interest continues to grow.`,
-        source: 'Market Analysis',
-        url: '#',
-        timestamp: currentTime - 3600000, // 1 hour ago
-        sentiment: 'positive',
-        aiTags: ['Technical Analysis', 'Market Update']
-      },
-      {
-        title: `Global Markets Impact on ${cryptoName}`,
-        description: `Global market conditions continue to influence ${cryptoName}'s price action. Analysts observe correlation with traditional markets while maintaining crypto-specific growth factors.`,
-        source: 'Market Insights',
-        url: '#',
-        timestamp: currentTime - 7200000, // 2 hours ago
-        sentiment: 'neutral',
-        aiTags: ['Market Analysis', 'Global Markets']
-      },
-      {
-        title: `${cryptoName} Trading Volume Analysis`,
-        description: `Trading volume analysis reveals interesting patterns in ${cryptoName} market activity. Institutional flows and retail participation show balanced market engagement.`,
-        source: 'Trading Analysis',
-        url: '#',
-        timestamp: currentTime - 10800000, // 3 hours ago
-        sentiment: 'positive',
-        aiTags: ['Volume Analysis', 'Trading']
-      },
-      {
-        title: `${cryptoName} Technical Support Levels Hold Strong`,
-        description: `Key technical support levels for ${cryptoName} remain intact as market tests critical price points. Analysts point to strong fundamental factors supporting current valuations.`,
-        source: 'Technical Analysis',
-        url: '#',
-        timestamp: currentTime - 14400000, // 4 hours ago
-        sentiment: 'positive',
-        aiTags: ['Technical Analysis', 'Support Levels']
-      },
-      {
-        title: `Market Sentiment Analysis: ${cryptoName}`,
-        description: `Current market sentiment analysis shows balanced perspectives on ${cryptoName}'s short-term price action. Technical indicators suggest continued market stability.`,
-        source: 'Sentiment Analysis',
-        url: '#',
-        timestamp: currentTime - 18000000, // 5 hours ago
-        sentiment: 'neutral',
-        aiTags: ['Sentiment Analysis', 'Market Mood']
-      }
-    ];
   },
 
   async getBatchPrices(coins: string[]): Promise<BatchPriceData> {

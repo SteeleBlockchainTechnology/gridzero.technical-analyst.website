@@ -217,7 +217,19 @@ class AdvancedAnalysisService {
       };
     } catch (error) {
       console.error('Error calculating market phase:', error);
-      return this.getDefaultMarketPhase(prices[prices.length - 1] || 0, crypto);
+      // Return a minimal safe structure indicating data unavailable
+      return {
+        phase: 'Data Unavailable',
+        strength: 0,
+        confidence: 0,
+        keyLevels: {
+          strongSupport: 0,
+          support: 0,
+          pivot: prices[prices.length - 1] || 0,
+          resistance: 0,
+          strongResistance: 0
+        }
+      };
     }
   }
 
@@ -324,7 +336,7 @@ class AdvancedAnalysisService {
       };
     } catch (error) {
       console.error('Error in price predictions:', error);
-      return this.getDefaultPredictions(data.currentPrice);
+      throw new Error('Price predictions unavailable due to calculation error. Please try again later.');
     }
   }
 
@@ -969,36 +981,6 @@ class AdvancedAnalysisService {
     return interpretation;
   }
 
-  // Update the getDefaultMarketPhase method to handle arrays
-  private getDefaultMarketPhase(currentPrice: number, crypto: string) {
-    // Default price ranges for different cryptocurrencies
-    const defaultRanges: Record<string, { support: number, resistance: number }> = {
-      'bitcoin': { support: 65000, resistance: 70000 },
-      'ethereum': { support: 2300, resistance: 2500 },
-      'binancecoin': { support: 280, resistance: 320 },
-      'cardano': { support: 0.45, resistance: 0.55 },
-      'solana': { support: 90, resistance: 110 }
-    };
-
-    const range = defaultRanges[crypto.toLowerCase()] || { 
-      support: currentPrice * 0.95, 
-      resistance: currentPrice * 1.05 
-    };
-
-    return {
-      phase: 'Analyzing',
-      strength: 0.5,
-      confidence: 50,
-      keyLevels: {
-        strongSupport: Number((range.support * 0.98).toFixed(2)),
-        support: Number(range.support.toFixed(2)),
-        pivot: Number(currentPrice.toFixed(2)),
-        resistance: Number(range.resistance.toFixed(2)),
-        strongResistance: Number((range.resistance * 1.02).toFixed(2))
-      }
-    };
-  }
-
   private generateRiskWarnings(volatility: number, trendStrength: number, volumeRatio: number): string[] {
     const warnings: string[] = [];
     
@@ -1327,44 +1309,9 @@ class AdvancedAnalysisService {
   }
 
 
+  // Remove default analysis - safer for trading
   private getDefaultAnalysis(crypto: string): AdvancedAnalysis {
-    const defaultPrice = 76000; // Updated default price for Bitcoin
-    return {
-      marketCondition: this.getDefaultMarketPhase(defaultPrice, crypto),
-      technicalSignals: {
-        trend: { primary: 'neutral', secondary: 'neutral', strength: 0.5 },
-        momentum: {
-          rsi: { value: 50, signal: 'neutral' },
-          macd: { value: 0, signal: 'neutral' },
-          stochRSI: { value: 50, signal: 'neutral' }
-        },
-        volatility: { current: 30, trend: 'stable', risk: 'low' },
-        volume: { change: 1, trend: 'neutral', significance: 'moderate' }
-      },
-      sentimentAnalysis: {
-        overall: { score: 50, signal: 'neutral', confidence: 50 },
-        components: {
-          news: { score: 50, recent: [], trend: 'neutral' },
-          social: { score: 50, trend: 'neutral', volume: 1 },
-          market: { score: 50, dominance: 50, flow: 'stable' }
-        }
-      },
-      predictions: this.getDefaultPredictions(defaultPrice),
-      riskAnalysis: {
-        overall: 50,
-        factors: { technical: 50, fundamental: 50, sentiment: 50, market: 50 },
-        warnings: ['Using default analysis due to data unavailability']
-      },
-      tradingStrategy: {
-        recommendation: 'Hold',
-        confidence: 50,
-        entries: { conservative: defaultPrice * 0.98, moderate: defaultPrice, aggressive: defaultPrice * 1.02 },
-        stopLoss: { tight: defaultPrice * 0.95, normal: defaultPrice * 0.93, wide: defaultPrice * 0.90 },
-        targets: { primary: defaultPrice * 1.05, secondary: defaultPrice * 1.10, final: defaultPrice * 1.15 },
-        timeframe: 'Medium-term',
-        rationale: ['Using default analysis due to data unavailability']
-      }
-    };
+    throw new Error(`Analysis unavailable for ${crypto}. Please ensure you have an active internet connection and try again.`);
   }
 
   private determineVolumeTrend(volumes: number[]): string {
@@ -1376,26 +1323,6 @@ class AdvancedAnalysisService {
     if (recentAvg > previousAvg * 1.1) return 'increasing';
     if (recentAvg < previousAvg * 0.9) return 'decreasing';
     return 'neutral';
-  }
-
-  private getDefaultPredictions(currentPrice: number) {
-    return {
-      shortTerm: {
-        price: { low: currentPrice * 0.95, high: currentPrice * 1.05 },
-        confidence: 50,
-        signals: ['Default prediction']
-      },
-      midTerm: {
-        price: { low: currentPrice * 0.90, high: currentPrice * 1.10 },
-        confidence: 40,
-        signals: ['Default prediction']
-      },
-      longTerm: {
-        price: { low: currentPrice * 0.85, high: currentPrice * 1.15 },
-        confidence: 30,
-        signals: ['Default prediction']
-      }
-    };
   }
 
   // Update the calculateSMA method to return a single number for the most recent MA

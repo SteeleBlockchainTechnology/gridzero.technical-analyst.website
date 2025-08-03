@@ -4,6 +4,7 @@ import React from 'react'
 import { Brain, TrendingUp, TrendingDown } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { DataUnavailable } from "@/components/ui/loading"
 import { PredictionData } from '@/services/types'
 
 interface PricePredictionsData {
@@ -40,7 +41,7 @@ export const PricePredictions: React.FC<PricePredictionsProps> = ({ data }) => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-white">Loading predictions...</div>
+          <DataUnavailable message="Price predictions are currently unavailable" />
         </CardContent>
       </Card>
     )
