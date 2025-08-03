@@ -14,7 +14,13 @@ const PORT = process.env.VITE_PORT || 3001;
 
 // CORS configuration
 app.use(cors({
-  origin: ['https://crypto-sensei.vercel.app', 'https://crypto-sensei.vercel.app'],
+  origin: [
+    'http://localhost:5173',  // Frontend dev server
+    'http://localhost:3001',  // Backend dev server
+    process.env.NODE_ENV === 'production' 
+      ? `http://${process.env.HOST || 'your-linux-server-ip'}:5173`  // Production frontend
+      : 'http://localhost:5173'
+  ],
   methods: ['GET', 'POST', 'OPTIONS'],
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -429,7 +435,16 @@ wss.on('connection', (ws: WebSocket) => {
 
 // Start server
 server.listen(PORT, () => {
-  console.log(`Server running at https://crypto-sensei.vercel.app:${PORT}`);
+  const environment = process.env.NODE_ENV || 'development';
+  const host = process.env.HOST || 'localhost';
+  const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+  
+  if (environment === 'development') {
+    console.log(`🚀 Development Server running at http://localhost:${PORT}`);
+    console.log(`📊 Frontend running at http://localhost:5173`);
+  } else {
+    console.log(`🚀 Production Server running at ${protocol}://${host}:${PORT}`);
+  }
 });
 
 // Error handling
@@ -451,4 +466,4 @@ process.on('SIGINT', () => {
   server.close(() => {
     process.exit(0);
   });
-}); 
+});

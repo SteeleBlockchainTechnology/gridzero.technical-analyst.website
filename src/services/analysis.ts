@@ -172,13 +172,47 @@ class AnalysisService {
   }
 
   private findSupportResistance(prices: number[]) {
-    const sortedPrices = [...prices].sort((a, b) => a - b);
-    const q1Index = Math.floor(prices.length * 0.25);
-    const q3Index = Math.floor(prices.length * 0.75);
+    if (prices.length < 20) {
+      // Fallback for insufficient data
+      const currentPrice = prices[prices.length - 1];
+      return {
+        support: currentPrice * 0.95,
+        resistance: currentPrice * 1.05
+      };
+    }
 
-    return {
-      support: sortedPrices[q1Index],
-      resistance: sortedPrices[q3Index]
+    const currentPrice = prices[prices.length - 1];
+    
+    // Use recent 20-50 periods for more relevant levels
+    const veryRecentPrices = prices.slice(-20);
+    
+    const highPrice = Math.max(...veryRecentPrices);
+    const lowPrice = Math.min(...veryRecentPrices);
+    
+    // Calculate moving averages for dynamic levels - Fixed method name
+    const ma20 = this.calculateSMA(prices, 20);
+    const ma50 = this.calculateSMA(prices, 50);
+    
+    // Calculate support using multiple factors
+    const support = Math.max(
+      lowPrice,                           // Recent low
+      Math.min(ma20, ma50) * 0.995,      // 0.5% below lower MA
+      currentPrice * 0.95                 // Max 5% below current price
+    );
+
+    // Calculate resistance using multiple factors
+    const resistance = Math.max(
+      Math.min(
+        highPrice,                        // Recent high
+        Math.max(ma20, ma50) * 1.005,    // 0.5% above higher MA
+        currentPrice * 1.05              // Max 5% above current price
+      ),
+      support * 1.01                     // Ensure resistance is at least 1% above support
+    );
+
+    return { 
+      support: Math.round(support * 100) / 100,      // Round to 2 decimals
+      resistance: Math.round(resistance * 100) / 100  // Round to 2 decimals
     };
   }
 
