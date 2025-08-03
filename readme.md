@@ -3,8 +3,11 @@
 A complete real-time cryptocurrency analysis platform that combines technical analysis, sentiment analysis, trading volume data, news trends, and AI-powered predictions to provide comprehensive market insights and trading recommendations.
 
 ## Try Out Here: https://crypto-sensei.vercel.app/
+
 (Note: You may hit the rate limit, as this is using Coingeko free API.)
+
 ## Table of Contents
+
 1. [Overview](#overview)
 2. [Features](#features)
 3. [Technical Architecture](#technical-architecture)
@@ -21,6 +24,7 @@ A complete real-time cryptocurrency analysis platform that combines technical an
 A Next.js-based cryptocurrency analysis platform that provides real-time market insights, technical analysis, and AI-powered trading recommendations. The platform combines multiple data sources and advanced algorithms to deliver comprehensive market analysis.
 
 ### Core Features
+
 - Real-time price tracking and analysis
 - Multiple timeframe support (1H, 4H, 1D, 1W, 1M)
 - Advanced technical analysis with multiple indicators
@@ -34,6 +38,7 @@ A Next.js-based cryptocurrency analysis platform that provides real-time market 
 ## Technical Architecture
 
 ### Frontend Stack
+
 - Next.js 14
 - TypeScript
 - TailwindCSS
@@ -42,6 +47,7 @@ A Next.js-based cryptocurrency analysis platform that provides real-time market 
 - TensorFlow.js
 
 ### Backend Services
+
 - Express.js server
 - WebSocket server for real-time data
 - TensorFlow.js for ML models
@@ -49,6 +55,7 @@ A Next.js-based cryptocurrency analysis platform that provides real-time market 
 - CoinGecko API integration
 
 ### Data Flow
+
 1. Real-time price data via WebSocket
 2. Historical data from CoinGecko API
 3. News data from NewsData API
@@ -60,6 +67,7 @@ A Next.js-based cryptocurrency analysis platform that provides real-time market 
 ## Core Components
 
 ### Market Analysis (`src/components/MarketAnalysis.tsx`)
+
 - Real-time market analysis dashboard
 - Technical indicator visualization
 - Price action analysis
@@ -67,12 +75,14 @@ A Next.js-based cryptocurrency analysis platform that provides real-time market 
 - Market structure detection
 
 ### Advanced Analysis (`src/components/AdvancedAnalysis.tsx`)
+
 - Comprehensive market analysis
 - Multiple analysis modules integration
 - Real-time data processing
 - Interactive visualization components
 
 ### News Panel (`src/components/NewsPanel.tsx`)
+
 - Real-time news aggregation
 - Sentiment analysis integration
 - Source credibility scoring
@@ -83,23 +93,26 @@ A Next.js-based cryptocurrency analysis platform that provides real-time market 
 ### Technical Analysis
 
 #### Technical indicators implemented:
+
 - RSI (Relative Strength Index)
 - MACD (Moving Average Convergence Divergence)
-Moving Averages (20, 50, 200)
-Bollinger Bands
-Volume Profile
-Support/Resistance Levels
+  Moving Averages (20, 50, 200)
+  Bollinger Bands
+  Volume Profile
+  Support/Resistance Levels
 
 ### Market Phase Detection
 
 #### Market phases identified:
+
 - Accumulation
 - Mark Up
-Distribution
-Mark Down
-Ranges and Transitions
+  Distribution
+  Mark Down
+  Ranges and Transitions
 
 ### Risk Analysis
+
 ```typescript
 // Risk factors considered:
 - Volatility Risk
@@ -111,6 +124,7 @@ Ranges and Transitions
 ```
 
 ### Trading Strategy Generation
+
 ```typescript
 // Strategy components:
 - Entry Points (Conservative, Moderate, Aggressive)
@@ -123,33 +137,41 @@ Ranges and Transitions
 ## AI Integration
 
 ### Machine Learning Models (`src/services/ml/models.ts`)
+
 - TrendModel: Predicts market trend direction
 - PriceModel: Generates price predictions
 - LevelModel: Identifies key price levels
 
 ### Model Architecture
+
 ```typescript
 // Sequential model structure:
-model.add(tf.layers.dense({
-  units: 32,
-  activation: 'relu',
-  inputShape: [4]
-}));
+model.add(
+  tf.layers.dense({
+    units: 32,
+    activation: "relu",
+    inputShape: [4],
+  })
+);
 model.add(tf.layers.dropout({ rate: 0.2 }));
-model.add(tf.layers.dense({
-  units: 16,
-  activation: 'relu'
-}));
+model.add(
+  tf.layers.dense({
+    units: 16,
+    activation: "relu",
+  })
+);
 ```
 
 ## Setup Instructions
 
 ### Prerequisites
+
 - Node.js 18+
 - npm or yarn
 - MongoDB (optional)
 
 ### Installation
+
 ```bash
 # Clone the repository
 git clone [repository-url]
@@ -170,27 +192,32 @@ npm start
 ```
 
 ### Environment Variables
+
 ```env
 VITE_PORT=3001
 VITE_NEWSDATA_API_KEY=your_api_key
-VITE_GEMINI_API_KEY=your_gemini_api_key
+VITE_GROQ_API_KEY=your_groq_api_key
 ```
 
 ## API Documentation
 
 ### WebSocket API
+
 ```typescript
 // Connect to WebSocket
 const ws = new WebSocket(`ws://crypto-sensei.vercel.app:3001`);
 
 // Subscribe to crypto updates
-ws.send(JSON.stringify({
-  type: 'subscribe',
-  crypto: 'bitcoin'
-}));
+ws.send(
+  JSON.stringify({
+    type: "subscribe",
+    crypto: "bitcoin",
+  })
+);
 ```
 
 ### REST API Endpoints
+
 ```typescript
 // Price data
 GET /api/crypto/price/:id
@@ -208,12 +235,14 @@ GET /api/analysis/:crypto
 ## Data Management
 
 ### Caching Strategy
+
 - Price data: 1 minute
 - News data: 15 minutes
 - Historical data: 5 minutes
 - Analysis results: 3 minutes
 
 ### Rate Limiting
+
 ```typescript
 const CACHE_DURATION = {
   PRICE: 1 * 60 * 1000,
@@ -226,6 +255,7 @@ const CACHE_DURATION = {
 ## Contributing
 
 ### Development Workflow
+
 1. Fork the repository
 2. Create a feature branch
 3. Implement changes
@@ -233,6 +263,7 @@ const CACHE_DURATION = {
 5. Submit pull request
 
 ### Code Style
+
 - Follow TypeScript best practices
 - Use ESLint configuration
 - Follow component structure guidelines
@@ -254,4 +285,3 @@ For support, email [sajan.writings@gmail.com].
 - CoinGecko API
 - NewsData API
 - Open source contributors
-

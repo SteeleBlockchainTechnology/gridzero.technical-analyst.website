@@ -1,7 +1,10 @@
-import { GoogleGenAI } from "@google/genai";
+import Groq from "groq-sdk";
 import { api } from "./api";
 
-const genAI = new GoogleGenAI({apiKey: import.meta.env.VITE_GEMINI_API});
+const groq = new Groq({
+  apiKey: import.meta.env.VITE_GROQ_API_KEY,
+  dangerouslyAllowBrowser: true
+});
 
 interface TechnicalIndicators {
   currentPrice: number;
@@ -369,17 +372,24 @@ class AnalysisService {
       Remove any markdown formatting and ensure all price levels are properly formatted with $ symbol.
     `;
 
-    const result = await genAI.models.generateContent({
-      model: "gemini-2.5-flash-preview-04-17",
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      config: {
-        thinkingConfig: {
-          thinkingBudget: 0,
-        },
-      },
-    });
+    try {
+      const completion = await groq.chat.completions.create({
+        model: "meta-llama/llama-4-maverick-17b-128e-instruct",
+        messages: [
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 2048
+      });
 
-    return result.text ?? "";
+      return completion.choices[0]?.message?.content ?? "";
+    } catch (error) {
+      console.error('Error calling Groq API:', error);
+      return "Unable to generate AI analysis at this time. Please try again later.";
+    }
   }
 
   private interpretRSI(rsi: number): string {
