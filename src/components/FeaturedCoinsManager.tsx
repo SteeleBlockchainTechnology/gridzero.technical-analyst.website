@@ -132,7 +132,7 @@ export const FeaturedCoinsManager: React.FC<FeaturedCoinsManagerProps> = ({
   return (
     <Card className="bg-black/30 backdrop-blur-lg border-none">
       <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-        <CardTitle className="text-xl font-bold text-blue-300">
+        <CardTitle className="text-xl font-bold text-green-300">
           Featured Coins
         </CardTitle>
         <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -143,7 +143,7 @@ export const FeaturedCoinsManager: React.FC<FeaturedCoinsManagerProps> = ({
             variant="ghost"
             size="icon"
             onClick={toggleSearch}
-            className="text-blue-400 hover:text-blue-300"
+            className="text-green-400 hover:text-green-300"
           >
             {isSearching ? <X className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
           </Button>
@@ -235,17 +235,13 @@ export const FeaturedCoinsManager: React.FC<FeaturedCoinsManagerProps> = ({
                           <div className="flex-1 px-2 min-w-0">
                             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                               <span className="text-sm font-medium text-white truncate">
-                                {coin.name} ({coin.symbol})
+                                {coin.symbol}
                               </span>
                               {coinMetadata[coin.id] && (
                                 <div className="flex items-center gap-2 text-xs text-slate-400">
                                   <span className="flex items-center whitespace-nowrap">
                                     <TrendingUp className="h-3 w-3 mr-1" />
                                     ${coinMetadata[coin.id].price.toLocaleString()}
-                                  </span>
-                                  <span className="flex items-center whitespace-nowrap">
-                                    <BarChart2 className="h-3 w-3 mr-1" />
-                                    ${coinMetadata[coin.id].marketCap.toLocaleString()}
                                   </span>
                                 </div>
                               )}

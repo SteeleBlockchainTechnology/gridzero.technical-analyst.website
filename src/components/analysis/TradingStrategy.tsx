@@ -15,7 +15,7 @@ export const TradingStrategy: React.FC<TradingStrategyProps> = ({ data }) => {
     return (
       <Card className="bg-black/30 backdrop-blur-lg border-none">
         <CardHeader>
-          <CardTitle className="text-xl font-bold text-blue-300 flex items-center gap-2">
+          <CardTitle className="text-xl font-bold text-green-300 flex items-center gap-2">
             <Target className="w-5 h-5" />
             Trading Strategy
           </CardTitle>
@@ -38,14 +38,14 @@ export const TradingStrategy: React.FC<TradingStrategyProps> = ({ data }) => {
       case 'buy': return 'from-green-400 to-green-600';
       case 'sell': return 'from-red-400 to-red-600';
       case 'hold': return 'from-yellow-400 to-yellow-600';
-      default: return 'from-blue-400 to-blue-600';
+      default: return 'from-green-400 to-green-600';
     }
   };
 
   return (
     <Card className="bg-black/30 backdrop-blur-lg border-none">
       <CardHeader>
-        <CardTitle className="text-lg md:text-xl font-bold text-blue-300 flex items-center gap-2">
+        <CardTitle className="text-lg md:text-xl font-bold text-green-300 flex items-center gap-2">
           <Crosshair className="w-5 h-5" />
           Trading Strategy
         </CardTitle>
@@ -149,7 +149,7 @@ export const TradingStrategy: React.FC<TradingStrategyProps> = ({ data }) => {
                 animate={{ x: 0, opacity: 1 }}
                 transition={{ duration: 0.3, delay: 0.9 + index * 0.1 }}
               >
-                <ArrowRight className="w-3 h-3 text-blue-400" />
+                <ArrowRight className="w-3 h-3 text-green-400" />
                 <span>{reason}</span>
               </motion.div>
             ))}

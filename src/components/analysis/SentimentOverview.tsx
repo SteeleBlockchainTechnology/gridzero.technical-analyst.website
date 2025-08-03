@@ -46,7 +46,7 @@ export const SentimentOverview = ({ data }: { data: any }) => {
           >
             <div className="flex justify-between items-center mb-2">
               <span className="text-sm text-slate-300">News Sentiment</span>
-              <span className="text-sm font-medium text-blue-400">{data.components.news.score.toFixed(1)}%</span>
+              <span className="text-sm font-medium text-green-400">{data.components.news.score.toFixed(1)}%</span>
             </div>
             <div className="space-y-1">
               {data.components.news.recent.map((news: string, index: number) => (
@@ -73,7 +73,7 @@ export const SentimentOverview = ({ data }: { data: any }) => {
             <div className="flex justify-between items-center">
               <span className="text-sm text-slate-300">Social Sentiment</span>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-blue-400">{data.components.social.score.toFixed(1)}%</span>
+                <span className="text-sm font-medium text-green-400">{data.components.social.score.toFixed(1)}%</span>
                 <span className="text-xs text-slate-400">
                   Vol: {data.components.social.volume.toLocaleString()}
                 </span>
@@ -91,7 +91,7 @@ export const SentimentOverview = ({ data }: { data: any }) => {
             <div className="flex justify-between items-center">
               <span className="text-sm text-slate-300">Market Flow</span>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-blue-400">{data.components.market.score.toFixed(1)}%</span>
+                <span className="text-sm font-medium text-green-400">{data.components.market.score.toFixed(1)}%</span>
                 <span className="text-xs text-slate-400">
                   Dom: {data.components.market.dominance.toFixed(1)}%
                 </span>

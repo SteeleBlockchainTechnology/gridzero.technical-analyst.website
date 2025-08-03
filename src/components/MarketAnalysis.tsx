@@ -69,8 +69,8 @@ const formatAIAnalysis = (htmlContent: string) => {
     <div className="space-y-6">
       {/* Market Analysis Section */}
       {sections.marketAnalysis && (
-        <div className="border-l-4 border-blue-500 pl-4">
-          <h4 className="text-lg font-semibold text-blue-400 mb-2">Strategic Market Analysis</h4>
+        <div className="border-l-4 border-green-500 pl-4">
+          <h4 className="text-lg font-semibold text-green-400 mb-2">Strategic Market Analysis</h4>
           <p className="text-gray-300 leading-relaxed">{sections.marketAnalysis}</p>
         </div>
       )}
@@ -115,7 +115,7 @@ const formatAIAnalysis = (htmlContent: string) => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               {sections.strategy.entry && (
                 <div className="bg-slate-700/30 p-4 rounded-lg">
-                  <h5 className="text-sm font-semibold text-blue-400 mb-2 flex items-center gap-2">
+                  <h5 className="text-sm font-semibold text-green-400 mb-2 flex items-center gap-2">
                     <Target className="w-4 h-4" />
                     Entry Zones
                   </h5>
@@ -222,7 +222,7 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto, predicti
       { 
         icon: LineChart, 
         text: "Collecting market data and price history...",
-        color: "text-blue-400"
+        color: "text-green-400"
       },
       { 
         icon: Brain, 
@@ -250,7 +250,7 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto, predicti
       <div className="flex flex-col items-center justify-center min-h-[400px] relative">
         {/* Background animation */}
         <motion.div
-          className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-blue-500/5 rounded-lg"
+          className="absolute inset-0 bg-gradient-to-br from-green-500/5 via-green-400/5 to-green-600/5 rounded-lg"
           animate={{
             backgroundPosition: ['0% 0%', '100% 100%'],
             scale: [1, 1.02, 1],
@@ -343,7 +343,7 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto, predicti
       {analysis?.summary && (
         <div className="bg-slate-800 rounded-lg p-4">
           <h3 className="font-medium flex items-center gap-2 mb-3 text-white">
-            <Brain className="w-5 h-5 text-blue-400" />
+            <Brain className="w-5 h-5 text-green-400" />
             Market Summary
           </h3>
           <div className="prose prose-invert max-w-none">

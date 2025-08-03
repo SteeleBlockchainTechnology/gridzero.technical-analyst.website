@@ -112,7 +112,7 @@ export const NewsPanel: React.FC<NewsPanelProps> = ({ crypto, news }) => {
                   {item.aiTags.map((tag, tagIndex) => (
                     <span
                       key={tagIndex}
-                      className="px-2 py-1 rounded-full bg-blue-500/20 text-blue-400 text-xs"
+                      className="px-2 py-1 rounded-full bg-green-500/20 text-green-400 text-xs"
                     >
                       {tag}
                     </span>

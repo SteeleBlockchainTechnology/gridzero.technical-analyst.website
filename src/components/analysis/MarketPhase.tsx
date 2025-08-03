@@ -25,7 +25,7 @@ export const MarketPhase: React.FC<MarketPhaseProps> = ({ data }) => {
     return (
       <Card className="bg-black/30 backdrop-blur-lg border-none">
         <CardHeader>
-          <CardTitle className="text-lg md:text-xl font-bold text-blue-300 flex items-center gap-2">
+          <CardTitle className="text-lg md:text-xl font-bold text-green-300 flex items-center gap-2">
             <Activity className="w-5 h-5" />
             Market Phase
           </CardTitle>
@@ -43,14 +43,14 @@ export const MarketPhase: React.FC<MarketPhaseProps> = ({ data }) => {
       case 'markup': return 'from-green-400 to-green-600'
       case 'distribution': return 'from-red-400 to-red-600'
       case 'markdown': return 'from-red-500 to-red-700'
-      default: return 'from-blue-400 to-blue-600'
+      default: return 'from-green-400 to-green-600'
     }
   }
 
   return (
     <Card className="bg-black/30 backdrop-blur-lg border-none overflow-hidden">
       <CardHeader>
-        <CardTitle className="text-lg md:text-xl font-bold text-blue-300 flex items-center gap-2">
+        <CardTitle className="text-lg md:text-xl font-bold text-green-300 flex items-center gap-2">
           <Activity className="w-5 h-5" />
           Market Phase
         </CardTitle>
@@ -76,7 +76,7 @@ export const MarketPhase: React.FC<MarketPhaseProps> = ({ data }) => {
             transition={{ duration: 0.8, ease: "easeOut" }}
           >
             <motion.div 
-              className="h-full bg-gradient-to-r from-blue-400 to-blue-600"
+              className="h-full bg-gradient-to-r from-green-400 to-green-600"
               initial={{ width: 0 }}
               animate={{ width: `${data.strength * 100}%` }}
               transition={{ duration: 0.5, delay: 0.8 }}

@@ -34,7 +34,7 @@ export const PricePredictions: React.FC<PricePredictionsProps> = ({ data }) => {
     return (
       <Card className="bg-black/30 backdrop-blur-lg border-none">
         <CardHeader>
-          <CardTitle className="text-xl font-bold text-blue-300 flex items-center gap-2">
+          <CardTitle className="text-xl font-bold text-green-300 flex items-center gap-2">
             <Brain className="w-5 h-5" />
             Price Predictions
           </CardTitle>
@@ -64,7 +64,7 @@ export const PricePredictions: React.FC<PricePredictionsProps> = ({ data }) => {
   return (
     <Card className="bg-black/30 backdrop-blur-lg border-none">
       <CardHeader>
-        <CardTitle className="text-xl font-bold text-blue-300 flex items-center gap-2">
+        <CardTitle className="text-xl font-bold text-green-300 flex items-center gap-2">
           <Brain className="w-5 h-5" />
           Price Predictions
         </CardTitle>
