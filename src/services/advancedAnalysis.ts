@@ -115,7 +115,7 @@ export interface AdvancedAnalysis {
 }
 
 class AdvancedAnalysisService {
-  private async calculateMarketPhase(prices: number[], volumeData: number[], crypto: string) {
+  private async calculateMarketPhase(prices: number[], volumeData: number[], _crypto: string) {
     try {
       if (!Array.isArray(prices) || !Array.isArray(volumeData)) {
         throw new Error('Invalid input data');
