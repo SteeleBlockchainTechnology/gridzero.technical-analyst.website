@@ -5,8 +5,15 @@ import * as dotenv from 'dotenv';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Request, Response, NextFunction } from 'express';
 import http from 'http';
+import session from 'express-session';
 
+// Load environment variables first
 dotenv.config();
+
+// Import passport after environment variables are loaded
+import { initializePassport } from './config/passport.js';
+
+const passport = initializePassport();
 
 const app = express();
 const server = http.createServer(app);
@@ -28,6 +35,50 @@ app.use(cors({
 
 app.use(express.json());
 
+// Authentication Middleware
+app.use(session({
+  secret: process.env.SESSION_SECRET!,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+const ensureVerified = (req: any, res: Response, next: NextFunction) => {
+  if (!req.isAuthenticated() || !(req.user as any).verified) {
+    return res.status(401).json({ error: 'Verification required. Please verify your Premium Access role.' });
+  }
+  next();
+};
+
+// Authentication Routes
+app.get('/api/auth/discord', passport.authenticate('discord'));
+
+app.get('/api/auth/discord/callback', passport.authenticate('discord', {
+  failureRedirect: '/verification-failed',
+  successRedirect: 'http://localhost:5173'  // Direct redirect to frontend
+}));
+
+app.get('/api/check-verification', (req, res) => {
+  res.json({ verified: req.isAuthenticated() && req.user && (req.user as any).verified });
+});
+
+app.get('/api/verification-failed', (req, res) => {
+  res.status(403).json({ error: 'Verification failed. Ensure you have the Premium Access role in the Discord server.' });
+});
+
+app.get('/api/auth/reset', (req, res) => {
+  req.logout((err: any) => {
+    if (err) return res.status(500).json({ error: 'Reset failed.' });
+    res.redirect('/');
+  });
+});
+
 // NewsData API configuration with rate limiting
 const NEWSDATA_API = 'https://newsdata.io/api/1/news';
 const NEWSDATA_API_KEY = process.env.VITE_NEWSDATA_API_KEY;
@@ -36,7 +87,7 @@ let lastNewsRequest = 0;
 const NEWS_REQUEST_DELAY = 60 * 1000; // 1 minute between requests
 
 // Add news endpoint with proper error handling and rate limiting
-app.get('/api/news/:crypto', async (req: Request, res: Response) => {
+app.get('/api/news/:crypto', ensureVerified, async (req: Request, res: Response) => {
   const { crypto } = req.params;
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 5;
@@ -181,7 +232,7 @@ interface CacheEntry {
 const cache = new Map<string, CacheEntry>();
 
 // Price endpoint with proper rate limiting and error handling
-app.get('/api/crypto/price/:id', async (req: Request, res: Response) => {
+app.get('/api/crypto/price/:id', ensureVerified, async (req: Request, res: Response) => {
   const { id } = req.params;
   const cacheKey = `price-${id}`;
 
@@ -258,7 +309,7 @@ app.get('/api/crypto/price/:id', async (req: Request, res: Response) => {
 });
 
 // Update the history endpoint to return proper data structure
-app.get('/api/crypto/history/:id', async (req: Request, res: Response) => {
+app.get('/api/crypto/history/:id', ensureVerified, async (req: Request, res: Response) => {
   const { id } = req.params;
   const { days = '1' } = req.query;
   const cacheKey = `history-${id}-${days}`;
