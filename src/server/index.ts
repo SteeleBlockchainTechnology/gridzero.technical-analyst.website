@@ -79,85 +79,149 @@ app.get('/api/auth/reset', (req, res) => {
   });
 });
 
+// Rate Limiting Configuration
+const RATE_LIMITS = {
+  COINGECKO: {
+    REQUESTS_PER_MINUTE: 10, // Conservative limit for free tier
+    REQUEST_DELAY: 6000,     // 6 seconds between requests
+    lastRequest: 0
+  },
+  NEWSDATA: {
+    REQUESTS_PER_MINUTE: 5,  // Very conservative for free tier
+    REQUEST_DELAY: 12000,    // 12 seconds between requests  
+    lastRequest: 0
+  }
+};
+
+// Rate limiter utility
+class RateLimiter {
+  private lastRequest: number = 0;
+  private delay: number;
+
+  constructor(delay: number) {
+    this.delay = delay;
+  }
+
+  async waitForNext(): Promise<void> {
+    const timeSinceLastRequest = Date.now() - this.lastRequest;
+    if (timeSinceLastRequest < this.delay) {
+      const waitTime = this.delay - timeSinceLastRequest;
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+    this.lastRequest = Date.now();
+  }
+
+  canMakeRequest(): boolean {
+    const timeSinceLastRequest = Date.now() - this.lastRequest;
+    return timeSinceLastRequest >= this.delay;
+  }
+}
+
+// Create rate limiters
+const coinGeckoLimiter = new RateLimiter(RATE_LIMITS.COINGECKO.REQUEST_DELAY);
+const newsDataLimiter = new RateLimiter(RATE_LIMITS.NEWSDATA.REQUEST_DELAY);
+
 // NewsData API configuration with rate limiting
 const NEWSDATA_API = 'https://newsdata.io/api/1/news';
 const NEWSDATA_API_KEY = process.env.VITE_NEWSDATA_API_KEY;
-const NEWS_CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
+const NEWS_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes - longer cache
 let lastNewsRequest = 0;
-const NEWS_REQUEST_DELAY = 60 * 1000; // 1 minute between requests
+const NEWS_REQUEST_DELAY = 12000; // 12 seconds between requests
 
 // Add news endpoint with proper error handling and rate limiting
 app.get('/api/news/:crypto', ensureVerified, async (req: Request, res: Response) => {
   const { crypto } = req.params;
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 5;
-  const cacheKey = `news-${crypto}-${page}`;
+  const limit = Math.min(parseInt(req.query.limit as string) || 5, 10); // Cap limit at 10
+  const cacheKey = `news-${crypto}`;
 
   try {
     // Check cache first
     const cached = cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < NEWS_CACHE_DURATION) {
+      console.log(`Using cached news data for ${crypto}`);
       return res.json(cached.data);
     }
 
     // Check rate limit
-    const timeSinceLastRequest = Date.now() - lastNewsRequest;
-    if (timeSinceLastRequest < NEWS_REQUEST_DELAY) {
+    if (!newsDataLimiter.canMakeRequest()) {
       if (cached) {
+        console.log(`Rate limited, using cached news data for ${crypto}`);
         return res.json(cached.data);
       }
       return res.status(429).json({ 
-        error: 'News API rate limit exceeded',
-        retryAfter: Math.ceil((NEWS_REQUEST_DELAY - timeSinceLastRequest) / 1000)
+        error: 'News API rate limit exceeded. Please try again later.',
+        articles: [],  // Frontend expects 'articles' not 'news'
+        retryAfter: 30
       });
     }
 
+    // Wait for rate limit before making request
+    await newsDataLimiter.waitForNext();
+
+    console.log(`Fetching fresh news data for ${crypto}...`);
     const response = await axios.get(NEWSDATA_API, {
       params: {
         apikey: NEWSDATA_API_KEY,
-        q: `${crypto} AND (price OR trading OR market OR investment) NOT (scam OR hack)`,
+        q: `${crypto} cryptocurrency`,
         language: 'en',
-        page: page,
-        size: limit
-      }
+        size: limit,
+        country: 'us',
+        category: 'business,technology'
+      },
+      timeout: 10000 // 10 second timeout
     });
 
     if (!response.data || response.data.status !== "success") {
       throw new Error('Invalid response from NewsData API');
     }
 
-    const processedNews = response.data.results
+    const processedNews = (response.data.results || [])
       .slice(0, limit)
       .map((item: any) => ({
-        title: item.title,
-        source: item.source_name,
-        url: item.link,
-        timestamp: new Date(item.pubDate).getTime(),
+        title: item.title || 'No title available',
+        source: item.source_name || 'Unknown source',
+        url: item.link || '#',
+        timestamp: item.pubDate ? new Date(item.pubDate).getTime() : Date.now(),
         sentiment: analyzeSentiment(item.title + ' ' + (item.description || '')),
-        description: item.description,
-        imageUrl: item.image_url
+        description: item.description || 'No description available',
+        imageUrl: item.image_url || null
       }));
 
+    const result = {
+      articles: processedNews,  // Frontend expects 'articles' not 'news'
+      cached: false,
+      timestamp: Date.now()
+    };
+
+    // Cache the successful result
     cache.set(cacheKey, {
-      data: {
-        articles: processedNews,
-        page,
-        totalResults: response.data.totalResults
-      },
+      data: result,
       timestamp: Date.now()
     });
 
-    lastNewsRequest = Date.now();
-    return res.json({ articles: processedNews });
+    console.log(`Successfully fetched ${processedNews.length} news items for ${crypto}`);
+    return res.json(result);
+
   } catch (error: any) {
     console.error('News API error:', error.response?.data || error.message);
     
+    // Try to return cached data on error
     const cached = cache.get(cacheKey);
     if (cached) {
-      return res.json(cached.data);
+      console.log(`Error occurred, using cached news data for ${crypto}`);
+      return res.json({
+        ...cached.data,
+        cached: true,
+        error: 'Using cached data due to API error'
+      });
     }
     
-    return res.status(500).json({ articles: [] });
+    // Return empty array with proper structure if no cache available
+    return res.status(500).json({ 
+      articles: [],  // Frontend expects 'articles' not 'news'
+      error: 'Failed to fetch news. Please try again later.',
+      cached: false
+    });
   }
 });
 
@@ -240,18 +304,26 @@ app.get('/api/crypto/price/:id', ensureVerified, async (req: Request, res: Respo
     // Check cache first
     const cached = cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION.PRICE) {
-      console.log('Using cached price data for', id);
+      console.log(`Using cached price data for ${id}`);
       return res.json(cached.data);
     }
 
     // Check rate limit
-    const timeSinceLastRequest = Date.now() - lastCoinGeckoRequest;
-    if (timeSinceLastRequest < COINGECKO_REQUEST_DELAY) {
-      await new Promise(resolve => 
-        setTimeout(resolve, COINGECKO_REQUEST_DELAY - timeSinceLastRequest)
-      );
+    if (!coinGeckoLimiter.canMakeRequest()) {
+      if (cached) {
+        console.log(`Rate limited, using cached price data for ${id}`);
+        return res.json(cached.data);
+      }
+      return res.status(429).json({ 
+        error: 'CoinGecko API rate limit exceeded. Please try again later.',
+        retryAfter: 30
+      });
     }
 
+    // Wait for rate limit before making request
+    await coinGeckoLimiter.waitForNext();
+
+    console.log(`Fetching fresh price data for ${id}...`);
     // Make request to CoinGecko
     const response = await axios.get(`${COINGECKO_API}/simple/price`, {
       params: {
@@ -261,10 +333,10 @@ app.get('/api/crypto/price/:id', ensureVerified, async (req: Request, res: Respo
         include_market_cap: true,
         include_last_updated_at: true
       },
-      timeout: 10000,
+      timeout: 15000, // 15 second timeout
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'Crypto Trading Dashboard'
+        'User-Agent': 'CryptoSensei-Dashboard/1.0'
       }
     });
 
@@ -272,38 +344,175 @@ app.get('/api/crypto/price/:id', ensureVerified, async (req: Request, res: Respo
       throw new Error('Invalid response from CoinGecko');
     }
 
-    lastCoinGeckoRequest = Date.now();
-
     // Format the response
-    const data = {
-      [id]: {
-        usd: response.data[id].usd,
-        usd_24h_change: response.data[id].usd_24h_change,
-        last_updated_at: response.data[id].last_updated_at,
-        market_cap: response.data[id].usd_market_cap
-      }
+    const coinData = response.data[id];
+    const formattedData = {
+      price: coinData.usd || 0,
+      change24h: coinData.usd_24h_change || 0,
+      marketCap: coinData.usd_market_cap || 0,
+      lastUpdated: coinData.last_updated_at || Date.now() / 1000,
+      timestamp: Date.now()
     };
 
     // Cache the result
     cache.set(cacheKey, {
-      data,
+      data: formattedData,
       timestamp: Date.now()
     });
 
-    return res.json(data);
+    console.log(`Successfully fetched price data for ${id}: $${formattedData.price}`);
+    return res.json(formattedData);
+
   } catch (error: any) {
     console.error('Price API error:', error.response?.data || error.message);
     
-    // Try to use cached data if available
+    // Try to return cached data on error
     const cached = cache.get(cacheKey);
     if (cached) {
-      console.log('Using stale cache for price data');
+      console.log(`Error occurred, using cached price data for ${id}`);
+      return res.json({
+        ...cached.data,
+        cached: true,
+        error: 'Using cached data due to API error'
+      });
+    }
+    
+    // Return fallback data if no cache available
+    return res.status(500).json({ 
+      price: 0,
+      change24h: 0,
+      marketCap: 0,
+      lastUpdated: Date.now() / 1000,
+      timestamp: Date.now(),
+      error: 'Failed to fetch price data. Please try again later.'
+    });
+  }
+});
+
+// Batch price endpoint for multiple cryptocurrencies
+app.get('/api/crypto/prices', ensureVerified, async (req: Request, res: Response) => {
+  const ids = req.query.ids as string || '';
+  const coinIds = ids.split(',').filter(id => id.trim().length > 0);
+  
+  if (coinIds.length === 0) {
+    return res.status(400).json({ error: 'No coin IDs provided' });
+  }
+
+  try {
+    const results: any = {};
+    const cacheKey = `batch-prices-${coinIds.sort().join(',')}`;
+
+    // Check cache first
+    const cached = cache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION.PRICE) {
+      console.log(`Using cached batch price data for ${coinIds.length} coins`);
       return res.json(cached.data);
+    }
+
+    // Check rate limit
+    if (!coinGeckoLimiter.canMakeRequest()) {
+      if (cached) {
+        console.log(`Rate limited, using cached batch price data for ${coinIds.length} coins`);
+        return res.json(cached.data);
+      }
+      return res.status(429).json({ 
+        error: 'CoinGecko API rate limit exceeded. Please try again later.',
+        retryAfter: 30
+      });
+    }
+
+    // Wait for rate limit before making request
+    await coinGeckoLimiter.waitForNext();
+
+    console.log(`Fetching fresh batch price data for ${coinIds.length} coins...`);
+    
+    // Make request to CoinGecko for multiple coins
+    const response = await axios.get(`${COINGECKO_API}/simple/price`, {
+      params: {
+        ids: coinIds.join(','),
+        vs_currencies: 'usd',
+        include_24hr_change: true,
+        include_market_cap: true,
+        include_last_updated_at: true
+      },
+      timeout: 15000,
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'CryptoSensei-Dashboard/1.0'
+      }
+    });
+
+    if (!response.data) {
+      throw new Error('Invalid response from CoinGecko');
+    }
+
+    // Format the response for each coin
+    for (const coinId of coinIds) {
+      if (response.data[coinId]) {
+        const coinData = response.data[coinId];
+        results[coinId] = {
+          price: coinData.usd || 0,
+          change24h: coinData.usd_24h_change || 0,
+          marketCap: coinData.usd_market_cap || 0,
+          lastUpdated: coinData.last_updated_at || Date.now() / 1000
+        };
+      } else {
+        // Fallback for missing coins
+        results[coinId] = {
+          price: 0,
+          change24h: 0,
+          marketCap: 0,
+          lastUpdated: Date.now() / 1000,
+          error: 'Coin not found'
+        };
+      }
+    }
+
+    const finalResult = {
+      ...results,
+      timestamp: Date.now()
+    };
+
+    // Cache the result
+    cache.set(cacheKey, {
+      data: finalResult,
+      timestamp: Date.now()
+    });
+
+    console.log(`Successfully fetched batch price data for ${coinIds.length} coins`);
+    return res.json(finalResult);
+
+  } catch (error: any) {
+    console.error('Batch price API error:', error.response?.data || error.message);
+    
+    // Try to return cached data on error
+    const cacheKey = `batch-prices-${coinIds.sort().join(',')}`;
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      console.log(`Error occurred, using cached batch price data for ${coinIds.length} coins`);
+      return res.json({
+        ...cached.data,
+        cached: true,
+        error: 'Using cached data due to API error'
+      });
+    }
+    
+    // Return fallback data if no cache available
+    const fallbackResults: any = {};
+    for (const coinId of coinIds) {
+      fallbackResults[coinId] = {
+        price: 0,
+        change24h: 0,
+        marketCap: 0,
+        lastUpdated: Date.now() / 1000,
+        error: 'Failed to fetch price data'
+      };
     }
     
     return res.status(500).json({ 
-      error: 'Failed to fetch price data',
-      details: error.response?.data?.status?.error_message || error.message
+      ...fallbackResults,
+      timestamp: Date.now(),
+      error: 'Failed to fetch batch price data. Please try again later.'
     });
   }
 });
@@ -311,68 +520,70 @@ app.get('/api/crypto/price/:id', ensureVerified, async (req: Request, res: Respo
 // Update the history endpoint to return proper data structure
 app.get('/api/crypto/history/:id', ensureVerified, async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { days = '1' } = req.query;
+  const daysParam = req.query.days as string || '1';
+  const days = parseInt(daysParam) || 1;
   const cacheKey = `history-${id}-${days}`;
 
   try {
     // Check cache first
     const cached = cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION.HISTORY) {
+      console.log(`Using cached historical data for ${id}`);
       return res.json(cached.data);
     }
 
-    // Wait for rate limit if needed
-    const timeSinceLastRequest = Date.now() - lastCoinGeckoRequest;
-    if (timeSinceLastRequest < COINGECKO_REQUEST_DELAY) {
-      await new Promise(resolve => 
-        setTimeout(resolve, COINGECKO_REQUEST_DELAY - timeSinceLastRequest)
-      );
+    // Check rate limit
+    if (!coinGeckoLimiter.canMakeRequest()) {
+      if (cached) {
+        console.log(`Rate limited, using cached historical data for ${id}`);
+        return res.json(cached.data);
+      }
+      return res.status(429).json({ 
+        error: 'CoinGecko API rate limit exceeded. Please try again later.',
+        retryAfter: 30
+      });
     }
 
+    // Wait for rate limit before making request
+    await coinGeckoLimiter.waitForNext();
+
+    console.log(`Fetching historical data for ${id}...`);
     // Fetch new data
     const response = await axios.get(`${COINGECKO_API}/coins/${id}/market_chart`, {
       params: {
         vs_currency: 'usd',
-        days: days,
-        interval: 'daily'
+        days: days.toString(),
+        interval: days > 30 ? 'daily' : 'hourly'
       },
-      timeout: 15000,
+      timeout: 20000, // 20 second timeout for historical data
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'Crypto Trading Dashboard'
+        'User-Agent': 'CryptoSensei-Dashboard/1.0'
       }
     });
-
-    lastCoinGeckoRequest = Date.now();
 
     if (!response.data || !response.data.prices) {
       throw new Error('Invalid response from CoinGecko');
     }
 
     // Process and validate the data
+    const prices = response.data.prices || [];
+    const marketCaps = response.data.market_caps || [];
+    const volumes = response.data.total_volumes || [];
+
+    console.log(`Raw data lengths - Prices: ${prices.length}, Volumes: ${volumes.length}, Market Caps: ${marketCaps.length}`);
+
     const processedData = {
-      prices: response.data.prices.map((item: [number, number]) => ({
-        timestamp: item[0],
-        price: parseFloat(item[1].toFixed(2))
-      })),
-      market_caps: response.data.market_caps.map((item: [number, number]) => ({
-        timestamp: item[0],
-        value: parseFloat(item[1].toFixed(2))
-      })),
-      total_volumes: response.data.total_volumes.map((item: [number, number]) => ({
-        timestamp: item[0],
-        value: parseFloat(item[1].toFixed(2))
-      })),
-      current_price: parseFloat(response.data.prices[response.data.prices.length - 1][1].toFixed(2)),
-      price_change_24h: calculatePriceChange(response.data.prices),
-      market_cap: parseFloat(response.data.market_caps[response.data.market_caps.length - 1][1].toFixed(2)),
-      total_volume: parseFloat(response.data.total_volumes[response.data.total_volumes.length - 1][1].toFixed(2))
+      prices: prices.map((item: [number, number]) => item[1]).slice(-200), // Last 200 data points
+      volumes: volumes.length > 0 ? volumes.map((item: [number, number]) => item[1]).slice(-200) : [],
+      timestamps: prices.map((item: [number, number]) => item[0]).slice(-200),
+      current_price: prices.length > 0 ? prices[prices.length - 1][1] : 0,
+      market_cap: marketCaps.length > 0 ? marketCaps[marketCaps.length - 1][1] : 0,
+      price_change_24h: calculatePriceChange(prices),
+      total_volume: volumes.length > 0 ? volumes[volumes.length - 1][1] : 0
     };
 
-    // Validate the processed data
-    if (!processedData.prices.length || !processedData.current_price) {
-      throw new Error('Invalid data structure');
-    }
+    console.log(`Processed data - Prices: ${processedData.prices.length}, Volumes: ${processedData.volumes.length}, Current Price: ${processedData.current_price}`);
 
     // Cache the result
     cache.set(cacheKey, {
@@ -380,24 +591,36 @@ app.get('/api/crypto/history/:id', ensureVerified, async (req: Request, res: Res
       timestamp: Date.now()
     });
 
-    console.log('Successfully fetched and processed historical data for', id);
-    console.log('Current price:', processedData.current_price);
-    console.log('24h change:', processedData.price_change_24h);
-
-    return res.json(processedData);
-  } catch (error: any) {
-    console.error('History API error:', error.message);
+    console.log(`Successfully fetched and processed historical data for ${id}`);
+    console.log(`Current price: ${processedData.current_price}`);
+    console.log(`24h change: ${processedData.price_change_24h}`);
     
-    // Try to use cached data if available
+    return res.json(processedData);
+
+  } catch (error: any) {
+    console.error('History API error:', error.response?.data || error.message);
+    
+    // Try to return cached data on error
     const cached = cache.get(cacheKey);
     if (cached) {
-      console.log('Using cached historical data for', id);
-      return res.json(cached.data);
+      console.log(`Error occurred, using cached historical data for ${id}`);
+      return res.json({
+        ...cached.data,
+        cached: true,
+        error: 'Using cached data due to API error'
+      });
     }
     
+    // Return fallback data if no cache available
     return res.status(500).json({ 
-      error: 'Failed to fetch historical data',
-      details: error.response?.data?.status?.error_message || error.message
+      prices: [],
+      volumes: [],
+      timestamps: [],
+      current_price: 0,
+      market_cap: 0,
+      price_change_24h: 0,
+      total_volume: 0,
+      error: 'Failed to fetch historical data. Please try again later.'
     });
   }
 });

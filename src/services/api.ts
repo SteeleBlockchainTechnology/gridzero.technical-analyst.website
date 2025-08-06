@@ -5,8 +5,8 @@ import Sentiment from 'sentiment';
 // Initialize sentiment analyzer as a singleton
 const sentimentAnalyzer = new Sentiment();
 
-// API Configuration
-const COINGECKO_API = 'https://api.coingecko.com/api/v3';
+// API Configuration - Use backend routes instead of direct external calls
+const API_BASE = '/api';
 
 // Basic cache entry interface
 interface CacheEntry {
@@ -28,22 +28,8 @@ const CACHE_DURATION = {
   SENTIMENT: 30 * 60 * 1000,   // 30 minutes
 };
 
-// Rate limiting configuration per endpoint
-const rateLimiter = {
-  newsdata: {
-    lastCall: 0,
-    minInterval: 60000, // 1 minute between calls
-    retryCount: 0,
-    maxRetries: 3,
-    backoffMultiplier: 2, // For exponential backoff
-    perCryptoCache: new Map<string, any>()
-  }
-};
-
 // Enhanced cache implementation with crypto-specific caching
 const cache = new Map<string, CacheEntry | NewsCacheEntry>();
-
-const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const isValidCache = (key: string, type: keyof typeof CACHE_DURATION) => {
   const cached = cache.get(key);
@@ -52,42 +38,6 @@ const isValidCache = (key: string, type: keyof typeof CACHE_DURATION) => {
   const isValid = Date.now() - cached.timestamp < CACHE_DURATION[type];
   console.log(`Cache ${key} is ${isValid ? 'valid' : 'expired'}`);
   return isValid;
-};
-
-// Enhanced rate limit handler with better caching
-const handleRateLimit = async (api: 'newsdata', crypto: string) => {
-  const limiter = rateLimiter[api];
-  const now = Date.now();
-  const timeSinceLastCall = now - limiter.lastCall;
-  
-  // Check if we have cached data for this crypto
-  const cachedData = limiter.perCryptoCache.get(crypto);
-  if (cachedData) {
-    console.log(`Using cached data for ${crypto} during rate limit`);
-    return cachedData;
-  }
-  
-  if (timeSinceLastCall < limiter.minInterval) {
-    const waitTime = limiter.minInterval * Math.pow(limiter.backoffMultiplier, limiter.retryCount);
-    console.log(`Rate limited for ${crypto}, using cache or waiting ${waitTime/1000} seconds...`);
-    
-    // Try to use cache first
-    const cacheKey = `news-${crypto}`;
-    const cachedNews = cache.get(cacheKey);
-    if (cachedNews) {
-      console.log(`Found cached news for ${crypto}`);
-      return cachedNews;
-    }
-    
-    // If no cache, wait and retry
-    await wait(waitTime);
-    limiter.retryCount++;
-  } else {
-    limiter.retryCount = 0;
-  }
-  
-  limiter.lastCall = Date.now();
-  return null;
 };
 
 export const api = {
@@ -99,26 +49,37 @@ export const api = {
     }
 
     try {
-      // Updated endpoint
-      const response = await axios.get(`${COINGECKO_API}/simple/price`, {
-        params: {
-          ids: crypto,
-          vs_currencies: 'usd',
-          include_24h_change: true
-        }
+      // Use backend API route instead of direct external call
+      const response = await axios.get(`${API_BASE}/crypto/price/${crypto}`, {
+        withCredentials: true
       });
 
       const data = {
-        price: response.data[crypto].usd,
-        change24h: response.data[crypto].usd_24h_change,
+        price: response.data.price,
+        change24h: response.data.change24h,
         timestamp: Date.now()
       };
 
       cache.set(cacheKey, { data, timestamp: Date.now() });
       return data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('API error:', error);
-      throw error;
+      
+      // Handle 429 rate limit errors by returning cached data if available
+      if (error.response?.status === 429) {
+        const cachedData = cache.get(cacheKey);
+        if (cachedData) {
+          console.log(`Rate limit hit, using cached price data for ${crypto}`);
+          return cachedData.data;
+        }
+      }
+      
+      // Return fallback data if no cache available
+      return {
+        price: 0,
+        change24h: 0,
+        timestamp: Date.now()
+      };
     }
   },
 
@@ -130,29 +91,46 @@ export const api = {
     }
 
     try {
-      const response = await axios.get(`${COINGECKO_API}/coins/${crypto}/market_chart`, {
-        params: {
-          vs_currency: 'usd',
-          days: days.toString(),
-          interval: 'daily'
-        }
+      const response = await axios.get(`${API_BASE}/crypto/history/${crypto}`, {
+        params: { days: days.toString() },
+        withCredentials: true
       });
 
-      // Transform the data into a consistent format
+      // The backend already returns processed data in the correct format
       const transformedData = {
-        prices: response.data.prices.map((item: [number, number]) => item[1]),
-        volumes: response.data.total_volumes.map((item: [number, number]) => item[1]),
-        timestamps: response.data.prices.map((item: [number, number]) => item[0]),
-        current_price: response.data.prices[response.data.prices.length - 1][1],
-        market_cap: response.data.market_caps[response.data.market_caps.length - 1][1],
-        price_change_24h: this.calculate24hChange(response.data.prices)
+        prices: response.data.prices || [],
+        volumes: response.data.volumes || [],
+        timestamps: response.data.timestamps || [],
+        current_price: response.data.current_price || 0,
+        market_cap: response.data.market_cap || 0,
+        price_change_24h: response.data.price_change_24h || 0,
+        total_volume: response.data.total_volume || 0
       };
 
       cache.set(cacheKey, { data: transformedData, timestamp: Date.now() });
       return transformedData;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching historical data:', error);
-      throw error;
+      
+      // Handle 429 rate limit errors by returning cached data if available
+      if (error.response?.status === 429) {
+        const cachedData = cache.get(cacheKey);
+        if (cachedData) {
+          console.log(`Rate limit hit, using cached historical data for ${crypto}`);
+          return cachedData.data;
+        }
+      }
+      
+      // Return fallback data structure if no cache available
+      return {
+        prices: [],
+        volumes: [],
+        timestamps: [],
+        current_price: 0,
+        market_cap: 0,
+        price_change_24h: 0,
+        total_volume: 0
+      };
     }
   },
 
@@ -160,6 +138,9 @@ export const api = {
     if (prices.length < 2) return 0;
     const currentPrice = prices[prices.length - 1][1];
     const yesterdayPrice = prices[prices.length - 2][1];
+    
+    if (!currentPrice || !yesterdayPrice || yesterdayPrice === 0) return 0;
+    
     return ((currentPrice - yesterdayPrice) / yesterdayPrice) * 100;
   },
 
@@ -214,64 +195,43 @@ export const api = {
     }
 
     try {
-      // Handle rate limiting with caching
-      const rateLimitResult = await handleRateLimit('newsdata', crypto);
-      if (rateLimitResult) {
-        return rateLimitResult;
-      }
-      
-      // Make API call if no cache hit
-      const response = await axios.get('https://newsdata.io/api/1/news', {
-        params: {
-          apikey: 'pub_5827833f271352bd4b9540e47433b0fc33dc5',
-          q: `${crypto} OR ${crypto.toLowerCase()} OR ${crypto.toUpperCase()}`,
-          language: 'en',
-          category: 'business,science,technology,world',
-          size: limit
-        },
+      // Use backend API route instead of direct external call
+      const response = await axios.get(`${API_BASE}/news/${crypto}`, {
+        params: { limit },
+        withCredentials: true,
         timeout: 10000
       });
 
-      if (!response.data?.results) {
+      if (!response.data?.articles) {
         throw new Error('Invalid news data format');
       }
 
-      const processedNews = response.data.results
-        .filter((item: any) => 
-          item.title && 
-          item.description && 
-          item.description.length > 100 && 
-          !item.title.includes('Sponsored') &&
-          !item.title.includes('Advertisement')
-        )
-        .map((item: any) => ({
-          title: item.title,
-          description: item.description,
-          source: item.source_id || 'Unknown Source',
-          url: item.link,
-          imageUrl: item.image_url,
-          timestamp: new Date(item.pubDate).getTime(),
-          sentiment: this.analyzeSentiment(item.title + ' ' + item.description),
-          aiTags: this.generateAITags(item.title, item.description)
-        }))
-        .slice(0, limit);
+      const processedNews = response.data.articles.slice(0, limit);
 
       // Cache the processed news
       const cacheEntry = {
         data: processedNews,
         timestamp: Date.now(),
-        hasMore: response.data.results.length > processedNews.length,
+        hasMore: response.data.articles.length > processedNews.length,
         page: 1
       };
       
       cache.set(cacheKey, cacheEntry);
-      rateLimiter.newsdata.perCryptoCache.set(crypto, { news: processedNews });
 
       return { news: processedNews };
     } catch (error: any) {
       console.error('Error fetching news:', error);
       
-      // Try to use cached data on error
+      // Handle 429 rate limit errors by returning cached data if available
+      if (error.response?.status === 429) {
+        const cachedNews = cache.get(cacheKey) as NewsCacheEntry;
+        if (cachedNews) {
+          console.log(`Rate limit hit, using cached news for ${crypto}`);
+          return { news: cachedNews.data };
+        }
+      }
+      
+      // Try to use any cached data on error
       const cachedNews = cache.get(cacheKey) as NewsCacheEntry;
       if (cachedNews) {
         console.log(`Using cached news for ${crypto} after error`);
@@ -558,16 +518,17 @@ export const api = {
 
     try {
       const response = await axios.get(
-        `${COINGECKO_API}/crypto/history/${crypto}`, {
-          params: { days }
+        `${API_BASE}/crypto/history/${crypto}`, {
+          params: { days },
+          withCredentials: true
         }
       );
 
       // Extract volume data from the response
-      const volumes = response.data.total_volumes.map((item: [number, number]) => ({
+      const volumes = response.data.total_volumes?.map((item: [number, number]) => ({
         timestamp: item[0],
         volume: item[1],
-      }));
+      })) || [];
 
       cache.set(cacheKey, { data: volumes, timestamp: Date.now() });
       return volumes;
@@ -590,31 +551,29 @@ export const api = {
     }
 
     try {
-      // Updated endpoint
-      const response = await axios.get(`${COINGECKO_API}/simple/price`, {
-        params: {
-          ids: coins.join(','),
-          vs_currencies: 'usd',
-          include_24h_change: true,
-          include_market_cap: true
-        }
+      // Use backend batch API route instead of individual calls
+      const response = await axios.get(`${API_BASE}/crypto/prices`, {
+        params: { ids: coins.join(',') },
+        withCredentials: true
       });
 
-      const batchData: BatchPriceData = {};
+      const batchData: BatchPriceData = response.data || {};
       
-      Object.entries(response.data).forEach(([id, data]: [string, any]) => {
-        batchData[id] = {
-          price: data.usd,
-          change24h: data.usd_24h_change || 0,
-          timestamp: Date.now(),
-          marketCap: data.usd_market_cap || 0
-        };
-      });
-
       cache.set(cacheKey, { data: batchData, timestamp: Date.now() });
       return batchData;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching batch prices:', error);
+      
+      // Handle 429 rate limit errors by returning cached data if available
+      if (error.response?.status === 429) {
+        const cachedData = cache.get(cacheKey);
+        if (cachedData) {
+          console.log(`Rate limit hit, using cached batch prices for ${coins.join(', ')}`);
+          return cachedData.data;
+        }
+      }
+      
+      // Return empty object as fallback
       return {};
     }
   },
@@ -628,12 +587,9 @@ export const api = {
 
     try {
       const promises = coins.map(coin => 
-        axios.get(`${COINGECKO_API}/coins/${coin}/market_chart`, {
-          params: {
-            vs_currency: 'usd',
-            days,
-            interval: 'daily'
-          }
+        axios.get(`${API_BASE}/crypto/history/${coin}`, {
+          params: { days },
+          withCredentials: true
         })
       );
 

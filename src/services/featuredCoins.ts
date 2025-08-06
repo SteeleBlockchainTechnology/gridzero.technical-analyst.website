@@ -5,9 +5,23 @@ const MAX_ACTIVE_COINS = 5;
 class FeaturedCoinsService {
   private readonly STORAGE_KEY = 'featured_coins';
   
+  private readonly DEFAULT_COINS: FeaturedCoin[] = [
+    { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin', isActive: true },
+    { id: 'ethereum', symbol: 'ETH', name: 'Ethereum', isActive: true },
+    { id: 'binancecoin', symbol: 'BNB', name: 'BNB', isActive: false },
+    { id: 'cardano', symbol: 'ADA', name: 'Cardano', isActive: false },
+    { id: 'solana', symbol: 'SOL', name: 'Solana', isActive: false }
+  ];
+  
   getFeaturedCoins(): FeaturedCoin[] {
     const stored = localStorage.getItem(this.STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
+    if (stored) {
+      return JSON.parse(stored);
+    }
+    
+    // Initialize with default coins if nothing is stored
+    this.updateFeaturedCoins(this.DEFAULT_COINS);
+    return this.DEFAULT_COINS;
   }
 
   updateFeaturedCoins(coins: FeaturedCoin[]): void {

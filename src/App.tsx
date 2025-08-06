@@ -161,7 +161,12 @@ function AppContent() {
             {/* Price Display */}
             <div className="flex items-center gap-2">
               <span className="text-2xl xl:text-3xl text-white font-bold">
-                ${price.price.toLocaleString()}
+                ${(price.price || 0).toLocaleString()}
+              </span>
+              <span className={`text-sm ${
+                (price.change24h || 0) >= 0 ? 'text-green-400' : 'text-red-400'
+              }`}>
+                {(price.change24h || 0) >= 0 ? '+' : ''}{(price.change24h || 0).toFixed(2)}%
               </span>
             </div>
           </div>

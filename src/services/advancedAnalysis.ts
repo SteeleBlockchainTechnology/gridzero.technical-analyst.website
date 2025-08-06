@@ -1007,13 +1007,13 @@ class AdvancedAnalysisService {
       const processedData = {
         prices: historicalData.prices,
         volumes: historicalData.volumes || Array(historicalData.prices.length).fill(0),
-        current_price: historicalData.current_price || historicalData.prices[historicalData.prices.length - 1],
-        market_cap: historicalData.market_cap,
-        price_change_24h: historicalData.price_change_24h
+        current_price: historicalData.current_price || historicalData.prices[historicalData.prices.length - 1] || 0,
+        market_cap: historicalData.market_cap || 0,
+        price_change_24h: historicalData.price_change_24h || 0
       };
 
       // Validate processed data
-      if (!processedData.current_price || processedData.prices.length === 0) {
+      if (processedData.current_price <= 0 || processedData.prices.length === 0) {
         console.error('Invalid processed data:', processedData);
         return this.getDefaultAnalysis(crypto);
       }

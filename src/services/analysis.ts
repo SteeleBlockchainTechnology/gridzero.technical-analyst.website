@@ -543,8 +543,8 @@ class AnalysisService {
 
       // Updated market summary with date-based formatting and current trend lines
       const latestDateIndex = prices.length - 1;
-      const latestPrice = prices[latestDateIndex];
-      const marketSummary = `${crypto.charAt(0).toUpperCase() + crypto.slice(1)} as of ${new Date().toLocaleDateString()} is in a ${marketPhase} phase, trading at $${latestPrice.toFixed(2)}. RSI is ${rsi.toFixed(2)} (${this.interpretRSI(rsi)}), with MACD indicating ${macd.interpretation}. The volume trend is ${obvTrend} with a ${volumeRatio.toFixed(2)}x change compared to the average volume.`;
+      const latestPrice = prices[latestDateIndex] || 0;
+      const marketSummary = `${crypto.charAt(0).toUpperCase() + crypto.slice(1)} as of ${new Date().toLocaleDateString()} is in a ${marketPhase} phase, trading at $${latestPrice.toFixed(2)}. RSI is ${(rsi || 0).toFixed(2)} (${this.interpretRSI(rsi || 0)}), with MACD indicating ${macd.interpretation}. The volume trend is ${obvTrend} with a ${(volumeRatio || 0).toFixed(2)}x change compared to the average volume.`;
 
       // Get market sentiment and news
       const sentiment = await this.getMarketSentiment(crypto);

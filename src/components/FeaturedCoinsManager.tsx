@@ -246,7 +246,7 @@ export const FeaturedCoinsManager: React.FC<FeaturedCoinsManagerProps> = ({
                               <span className="text-sm font-medium text-white truncate">
                                 {coin.symbol}
                               </span>
-                              {coinMetadata[coin.id] && (
+                              {coinMetadata[coin.id] && coinMetadata[coin.id].price && (
                                 <div className="flex items-center gap-2 text-xs text-slate-400">
                                   <span className="flex items-center whitespace-nowrap">
                                     <TrendingUp className="h-3 w-3 mr-1" />

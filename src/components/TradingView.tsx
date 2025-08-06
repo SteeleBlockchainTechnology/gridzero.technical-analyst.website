@@ -77,31 +77,42 @@ export const TradingView: React.FC<TradingViewProps> = ({ crypto, timeframe, pri
         script.src = 'https://s3.tradingview.com/tv.js';
         script.async = true;
         script.onload = () => {
-          if (typeof TradingView !== 'undefined' && widget.parentNode) {
-            new (window as any).TradingView.widget({
-              autosize: true,
-              symbol: getSymbol(crypto),
-              interval: intervalMap[timeframe] || 'D',
-              container_id: widgetId,
-              theme: 'dark',
-              style: '1',
-              locale: 'en',
-              toolbar_bg: '#f1f3f6',
-              enable_publishing: false,
-              allow_symbol_change: true,
-              save_image: false,
-              hide_side_toolbar: false,
-              withdateranges: true,
-              hide_volume: false,
-              studies: [
-                'MASimple@tv-basicstudies',
-                'RSI@tv-basicstudies',
-                'MACD@tv-basicstudies'
-              ],
-              fullscreen: true,
-              height: '100%',
-              width: '100%'
-            });
+          if (typeof TradingView !== 'undefined' && widget.parentNode && container.current && container.current.contains(widget)) {
+            try {
+              new (window as any).TradingView.widget({
+                autosize: true,
+                symbol: getSymbol(crypto),
+                interval: intervalMap[timeframe] || 'D',
+                container_id: widgetId,
+                theme: 'dark',
+                style: '1',
+                locale: 'en',
+                toolbar_bg: '#f1f3f6',
+                enable_publishing: false,
+                allow_symbol_change: true,
+                save_image: false,
+                hide_side_toolbar: false,
+                withdateranges: true,
+                hide_volume: false,
+                studies: [
+                  'MASimple@tv-basicstudies',
+                  'RSI@tv-basicstudies',
+                  'MACD@tv-basicstudies'
+                ],
+                fullscreen: true,
+                height: '100%',
+                width: '100%'
+              });
+            } catch (error) {
+              console.error('Error creating TradingView widget:', error);
+              if (container.current && widget.parentNode) {
+                widget.innerHTML = `
+                  <div class="flex items-center justify-center h-full text-slate-400">
+                    Chart temporarily unavailable. Please refresh the page.
+                  </div>
+                `;
+              }
+            }
           }
         };
 
