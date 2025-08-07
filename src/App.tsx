@@ -60,22 +60,47 @@ function AppContent() {
   }, [location.pathname]);
 
   // Your original useEffects - only run when verified
+  // Reset price when crypto changes and fetch new data
   useEffect(() => {
     if (!isVerified) return;
 
-    const fetchPriceData = async () => {
-      try {
-        const priceData = await api.getPrice(crypto);
-        setPrice(priceData);
-      } catch (error) {
-        console.error('Error fetching price data:', error);
+    // Reset price to show loading state when switching crypto
+    setPrice({
+      price: 0,
+      change24h: 0,
+      timestamp: Date.now()
+    });
+
+    let priceInterval: NodeJS.Timeout;
+
+    // Debounce the price fetch to avoid rapid API calls when switching coins
+    const fetchTimeout = setTimeout(async () => {
+      const fetchPriceData = async () => {
+        try {
+          const priceData = await api.getPrice(crypto);
+          // Only update if we get valid price data
+          if (priceData && priceData.price > 0) {
+            setPrice(priceData);
+          } else {
+            console.log(`No valid price data for ${crypto}, keeping loading state`);
+          }
+        } catch (error) {
+          console.error('Error fetching price data:', error);
+          // Don't reset price to 0 on error - keep loading state
+        }
+      };
+
+      await fetchPriceData();
+      // Increase interval to 2 minutes to reduce API pressure
+      priceInterval = setInterval(fetchPriceData, 120000);
+    }, 500); // 500ms debounce
+
+    return () => {
+      clearTimeout(fetchTimeout);
+      if (priceInterval) {
+        clearInterval(priceInterval);
       }
     };
-
-    fetchPriceData();
-    const priceInterval = setInterval(fetchPriceData, 60000);
-
-    return () => clearInterval(priceInterval);
   }, [crypto, isVerified]);
 
   useEffect(() => {
@@ -162,6 +187,9 @@ function AppContent() {
             <div className="flex items-center gap-2">
               <span className="text-2xl xl:text-3xl text-white font-bold">
                 ${(price.price || 0).toLocaleString()}
+                {price.price === 0 && (
+                  <span className="text-sm text-yellow-400 ml-2">(Loading...)</span>
+                )}
               </span>
               <span className={`text-sm ${
                 (price.change24h || 0) >= 0 ? 'text-green-400' : 'text-red-400'

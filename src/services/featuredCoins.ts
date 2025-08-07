@@ -73,13 +73,17 @@ class FeaturedCoinsService {
 
   async searchCoins(query: string): Promise<FeaturedCoin[]> {
     try {
-      // Use CoinGecko API for searching coins
-      const response = await fetch(
-        `https://api.coingecko.com/api/v3/search?query=${query}`
-      );
-      const data = await response.json();
+      // Use backend API instead of direct CoinGecko call
+      const response = await fetch(`/api/crypto/search?query=${encodeURIComponent(query)}`, {
+        credentials: 'include'
+      });
       
-      return data.coins.map((coin: any) => ({
+      if (!response.ok) {
+        throw new Error('Search failed');
+      }
+      
+      const data = await response.json();
+      return (data.coins || []).map((coin: any) => ({
         id: coin.id,
         symbol: coin.symbol.toUpperCase(),
         name: coin.name,

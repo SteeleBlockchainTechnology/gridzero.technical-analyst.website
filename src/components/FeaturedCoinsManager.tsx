@@ -61,7 +61,8 @@ export const FeaturedCoinsManager: React.FC<FeaturedCoinsManagerProps> = ({
     };
 
     fetchMetadata();
-    const interval = setInterval(fetchMetadata, 30000);
+    // Increase interval to 2 minutes to reduce API calls
+    const interval = setInterval(fetchMetadata, 120000);
 
     return () => clearInterval(interval);
   }, [coins]);

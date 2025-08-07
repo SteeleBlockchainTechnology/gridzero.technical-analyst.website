@@ -116,8 +116,8 @@ class WebSocketService {
       }
     };
 
-    // Poll every 10 seconds if WebSocket is not available
-    this.pricePollingInterval = setInterval(pollPrice, 10000);
+    // Poll every 2 minutes (120 seconds) instead of 10 seconds to reduce API calls
+    this.pricePollingInterval = setInterval(pollPrice, 120000);
     // Initial poll
     pollPrice();
   }

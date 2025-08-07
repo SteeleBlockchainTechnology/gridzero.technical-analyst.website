@@ -20,11 +20,11 @@ interface NewsCacheEntry extends CacheEntry {
   page: number;
 }
 
-// Enhanced cache configuration
+// Enhanced cache configuration - More aggressive caching to reduce API calls
 const CACHE_DURATION = {
-  PRICE: 1 * 60 * 1000,        // 1 minute
-  NEWS: 15 * 60 * 1000,        // 15 minutes
-  HISTORICAL: 5 * 60 * 1000,   // 5 minutes
+  PRICE: 3 * 60 * 1000,        // 3 minutes - longer cache for prices
+  NEWS: 30 * 60 * 1000,        // 30 minutes
+  HISTORICAL: 10 * 60 * 1000,  // 10 minutes
   SENTIMENT: 30 * 60 * 1000,   // 30 minutes
 };
 
@@ -51,17 +51,29 @@ export const api = {
     try {
       // Use backend API route instead of direct external call
       const response = await axios.get(`${API_BASE}/crypto/price/${crypto}`, {
-        withCredentials: true
+        withCredentials: true,
+        timeout: 15000 // 15 second timeout
       });
 
       const data = {
-        price: response.data.price,
-        change24h: response.data.change24h,
+        price: response.data.price || 0,
+        change24h: response.data.change24h || 0,
         timestamp: Date.now()
       };
 
-      cache.set(cacheKey, { data, timestamp: Date.now() });
-      return data;
+      // Only cache and return if we have valid price data
+      if (data.price > 0) {
+        cache.set(cacheKey, { data, timestamp: Date.now() });
+        return data;
+      } else {
+        // Try to return cached data if current price is 0
+        const cachedData = cache.get(cacheKey);
+        if (cachedData && cachedData.data.price > 0) {
+          console.log(`Invalid price data received, using cached price for ${crypto}`);
+          return cachedData.data;
+        }
+        return data; // Return the 0 price if no cache available
+      }
     } catch (error: any) {
       console.error('API error:', error);
       
@@ -72,6 +84,14 @@ export const api = {
           console.log(`Rate limit hit, using cached price data for ${crypto}`);
           return cachedData.data;
         }
+        console.log(`Rate limit hit, no cached data available for ${crypto}`);
+      }
+      
+      // For any error, try to return cached data first
+      const cachedData = cache.get(cacheKey);
+      if (cachedData && cachedData.data.price > 0) {
+        console.log(`API error, using cached price data for ${crypto}`);
+        return cachedData.data;
       }
       
       // Return fallback data if no cache available

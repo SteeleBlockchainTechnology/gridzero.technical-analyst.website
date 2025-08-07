@@ -278,14 +278,14 @@ const wss = new WebSocketServer({ server });
 // CoinGecko API configuration with proper rate limiting
 const COINGECKO_API = 'https://api.coingecko.com/api/v3';
 const CACHE_DURATION = {
-  PRICE: 2 * 60 * 1000,      // 2 minutes
+  PRICE: 5 * 60 * 1000,      // 5 minutes - longer cache to reduce API calls
   HISTORY: 30 * 60 * 1000,   // 30 minutes
-  MARKET: 5 * 60 * 1000      // 5 minutes
+  MARKET: 10 * 60 * 1000     // 10 minutes
 };
 
 // Rate limiting for CoinGecko
 let lastCoinGeckoRequest = 0;
-const COINGECKO_REQUEST_DELAY = 6000; // 6 seconds between requests
+const COINGECKO_REQUEST_DELAY = 10000; // 10 seconds between requests - more conservative
 
 // Cache implementation
 interface CacheEntry {
@@ -294,6 +294,39 @@ interface CacheEntry {
 }
 
 const cache = new Map<string, CacheEntry>();
+
+// Search endpoint for coin search through the backend
+app.get('/api/crypto/search', ensureVerified, async (req: Request, res: Response) => {
+  try {
+    const { query } = req.query;
+    
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({ error: 'Query parameter is required' });
+    }
+
+    // Check rate limit
+    if (!coinGeckoLimiter.canMakeRequest()) {
+      return res.status(429).json({
+        error: 'CoinGecko API rate limit exceeded. Please try again later.'
+      });
+    }
+
+    await coinGeckoLimiter.waitForNext();
+
+    const response = await axios.get(`${COINGECKO_API}/search`, {
+      params: { query },
+      timeout: 10000
+    });
+
+    res.json({
+      coins: response.data.coins?.slice(0, 10) || []
+    });
+
+  } catch (error) {
+    console.error('Error searching coins:', error);
+    res.status(500).json({ error: 'Failed to search coins' });
+  }
+});
 
 // Price endpoint with proper rate limiting and error handling
 app.get('/api/crypto/price/:id', ensureVerified, async (req: Request, res: Response) => {
