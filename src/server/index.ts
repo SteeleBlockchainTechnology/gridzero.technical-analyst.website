@@ -115,6 +115,11 @@ class RateLimiter {
     const timeSinceLastRequest = Date.now() - this.lastRequest;
     return timeSinceLastRequest >= this.delay;
   }
+
+  getWaitTime(): number {
+    const timeSinceLastRequest = Date.now() - this.lastRequest;
+    return Math.max(0, this.delay - timeSinceLastRequest);
+  }
 }
 
 // Create rate limiters
@@ -304,26 +309,46 @@ app.get('/api/crypto/search', ensureVerified, async (req: Request, res: Response
       return res.status(400).json({ error: 'Query parameter is required' });
     }
 
-    // Check rate limit
+    // Check rate limit before making request
     if (!coinGeckoLimiter.canMakeRequest()) {
       return res.status(429).json({
-        error: 'CoinGecko API rate limit exceeded. Please try again later.'
+        error: 'Rate limit exceeded. Please try again later.',
+        retryAfter: coinGeckoLimiter.getWaitTime()
       });
     }
 
+    // Wait for rate limit
     await coinGeckoLimiter.waitForNext();
 
+    console.log(`Searching CoinGecko for: ${query}`);
+    
+    // Call CoinGecko search API
     const response = await axios.get(`${COINGECKO_API}/search`, {
       params: { query },
-      timeout: 10000
+      timeout: 15000
     });
 
+    // Return search results (limit to top 10)
+    const coins = response.data.coins?.slice(0, 10) || [];
+    
     res.json({
-      coins: response.data.coins?.slice(0, 10) || []
+      coins: coins.map((coin: any) => ({
+        id: coin.id,
+        symbol: coin.symbol.toUpperCase(),
+        name: coin.name
+      }))
     });
 
   } catch (error) {
     console.error('Error searching coins:', error);
+    
+    if (axios.isAxiosError(error) && error.response?.status === 429) {
+      return res.status(429).json({
+        error: 'CoinGecko rate limit exceeded',
+        retryAfter: 60
+      });
+    }
+    
     res.status(500).json({ error: 'Failed to search coins' });
   }
 });

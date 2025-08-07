@@ -14,10 +14,14 @@ import type { NewsItem, PredictionData, CryptoPrice, FeaturedCoin } from './serv
 import { Coins, Clock} from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
+import { CoinSearchSelect } from './components/ui/CoinSearchSelect';
+
 import { Button } from "./components/ui/button"
-import { featuredCoinsService } from './services/featuredCoins'
-import { FeaturedCoinsManager } from './components/FeaturedCoinsManager';
+
+
+// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select' 
+// import { featuredCoinsService } from './services/featuredCoins'
+// import { FeaturedCoinsManager } from './components/FeaturedCoinsManager';
 
 function AppContent() {
   // Authentication state
@@ -35,7 +39,7 @@ function AppContent() {
   })
   const [predictions, setPredictions] = useState<PredictionData[]>([])
   const [timeframe, setTimeframe] = useState('1D')
-  const [featuredCoins, setFeaturedCoins] = useState<FeaturedCoin[]>([]);
+//  const [featuredCoins, setFeaturedCoins] = useState<FeaturedCoin[]>([]);
 
   const timeframes = ['1H', '4H', '1D', '1W', '1M']
 
@@ -123,17 +127,17 @@ function AppContent() {
     fetchData();
   }, [crypto, isVerified]);
 
-  useEffect(() => {
-    if (!isVerified) return;
-    setFeaturedCoins(featuredCoinsService.getFeaturedCoins());
-  }, [isVerified]);
+//  useEffect(() => {
+//    if (!isVerified) return;
+//    setFeaturedCoins(featuredCoinsService.getFeaturedCoins());
+//  }, [isVerified]);
 
-  const handleToggleCoin = (coinId: string) => {
-    const updatedCoins = featuredCoinsService.toggleCoinStatus(coinId);
-    setFeaturedCoins(updatedCoins);
-  };
+//  const handleToggleCoin = (coinId: string) => {
+//    const updatedCoins = featuredCoinsService.toggleCoinStatus(coinId);
+//    setFeaturedCoins(updatedCoins);
+//  };
 
-  const activeFeaturedCoins = featuredCoins.filter(coin => coin.isActive);
+//  const activeFeaturedCoins = featuredCoins.filter(coin => coin.isActive);
 
   if (loading) {
     return (
@@ -160,8 +164,16 @@ function AppContent() {
         {/* Header Section - Made responsive */}
         <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 mb-6">
           <div className="flex flex-col w-full xl:w-auto gap-4">
-            {/* Crypto Selection */}
             <div className="flex items-center gap-2">
+              <Coins className="w-8 h-8 text-green-400" />
+              <CoinSearchSelect
+                value={crypto}
+                onValueChange={(value: string) => setCrypto(value)}
+                placeholder="Search for a cryptocurrency..."
+              />
+            </div>
+            {/* Crypto Selection */}
+            {/*<div className="flex items-center gap-2">
               <Coins className="w-8 h-8 text-green-400" />
               <Select onValueChange={(value: string) => setCrypto(value)} defaultValue={crypto}>
                 <SelectTrigger className="w-full xl:w-[180px]">
@@ -182,7 +194,7 @@ function AppContent() {
                 </SelectContent>
               </Select>
             </div>
-
+            */}
             {/* Price Display */}
             <div className="flex items-center gap-2">
               <span className="text-2xl xl:text-3xl text-white font-bold">
@@ -302,7 +314,7 @@ function AppContent() {
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.5 }}
               >
-                <FeaturedCoinsManager 
+{/*                <FeaturedCoinsManager 
                   coins={featuredCoins}
                   onToggleCoin={handleToggleCoin}
                   onReorderCoins={(coins) => {
@@ -318,6 +330,7 @@ function AppContent() {
                     setFeaturedCoins(updatedCoins);
                   }}
                 />
+*/}
               </motion.div>
             </AnimatePresence>
 

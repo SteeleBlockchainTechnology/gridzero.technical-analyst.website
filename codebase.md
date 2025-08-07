@@ -729,3 +729,172 @@ index.ts
 ```
 
 This architecture provides a robust, scalable cryptocurrency dashboard with real-time updates, intelligent caching, and comprehensive error handling. The separation between frontend and backend allows for independent scaling and deployment while maintaining type safety and consistent data flow patterns.
+
+graph TB
+%% Entry Points
+main[main.tsx] --> app[App.tsx]
+index[index.html] --> main
+vite[vite.config.ts] --> main
+
+    %% Main App Structure
+    app --> layout[Layout.tsx]
+    app --> api[api.ts]
+    app --> featuredCoins[featuredCoins.ts]
+    app --> types[types.ts]
+
+    %% Core Components
+    app --> trading[TradingView.tsx]
+    app --> market[MarketAnalysis.tsx]
+    app --> advanced[AdvancedAnalysis.tsx]
+    app --> featured[FeaturedCoinsManager.tsx]
+    app --> news[NewsPanel.tsx]
+
+    %% UI Components
+    trading --> button[ui/button.tsx]
+    market --> card[ui/card.tsx]
+    advanced --> loading[ui/loading.tsx]
+    featured --> select[ui/select.tsx]
+    news --> input[ui/input.tsx]
+
+    %% Analysis Components
+    advanced --> tech[analysis/TechnicalSignals.tsx]
+    advanced --> sentiment[analysis/SentimentOverview.tsx]
+    advanced --> predictions[analysis/PricePredictions.tsx]
+    advanced --> risk[analysis/RiskAnalysis.tsx]
+    advanced --> strategy[analysis/TradingStrategy.tsx]
+    advanced --> phase[analysis/MarketPhase.tsx]
+
+    %% Error Handling
+    app --> error[ErrorBoundary.tsx]
+
+    %% Backend Server
+    server[server/index.ts] --> express[Express App]
+    server --> ws[WebSocket Server]
+    server --> cache[Cache System]
+
+    %% API Routes
+    express --> priceAPI[/api/crypto/price/:id]
+    express --> newsAPI[/api/news/:crypto]
+    express --> historyAPI[/api/crypto/history/:id]
+
+    %% External APIs
+    priceAPI --> coingecko[CoinGecko API]
+    newsAPI --> newsdata[NewsData.io API]
+    trading --> tradingview[TradingView Widgets]
+
+    %% Data Flow
+    api -.->|Proxy| vite
+    vite -.->|Forward| server
+    server -.->|Response| api
+
+    %% WebSocket Connection
+    app -.->|WebSocket| ws
+    ws -.->|Real-time Updates| app
+
+    %% Local Storage
+    featured --> localStorage[Local Storage]
+    featuredCoins --> localStorage
+
+    %% Configuration
+    env[.env] --> server
+    package[package.json] --> vite
+    package --> server
+
+    %% Styling
+    app --> tailwind[Tailwind CSS]
+    card --> shadcn[Shadcn/UI]
+    button --> shadcn
+
+    %% Type Definitions
+    types --> api
+    types --> app
+    types --> server
+
+    %% Development Tools
+    tsx[tsx] --> server
+    typescript[TypeScript] --> app
+    typescript --> server
+
+    %% Cache Dependencies
+    cache --> priceAPI
+    cache --> newsAPI
+    cache --> historyAPI
+
+    %% Sentiment Analysis
+    newsAPI --> sentiment_engine[Sentiment Analysis Engine]
+
+    style main fill:#ff6b6b
+    style app fill:#4ecdc4
+    style server fill:#45b7d1
+    style api fill:#96ceb4
+    style types fill:#ffa726
+    style coingecko fill:#e8f5e8
+    style newsdata fill:#e8f5e8
+    style tradingview fill:#e8f5e8
+
+
+
+
+
+
+    graph LR
+    subgraph "Frontend (Port 5173)"
+        UI[React Components]
+        Services[API Services]
+        State[App State]
+        WS_Client[WebSocket Client]
+    end
+
+    subgraph "Development Proxy"
+        Vite[Vite Proxy]
+    end
+
+    subgraph "Backend (Port 3001)"
+        Express[Express Server]
+        Cache[In-Memory Cache]
+        WS_Server[WebSocket Server]
+        Sentiment[Sentiment Engine]
+    end
+
+    subgraph "External APIs"
+        CoinGecko[CoinGecko API]
+        NewsData[NewsData.io]
+        TradingView[TradingView Widgets]
+    end
+
+    subgraph "Storage"
+        LocalStorage[Browser LocalStorage]
+    end
+
+    %% Frontend Internal
+    UI --> Services
+    Services --> State
+    State --> UI
+
+    %% Frontend to Backend
+    Services -->|/api requests| Vite
+    Vite -->|Proxy| Express
+    Express -->|JSON Response| Services
+
+    %% WebSocket Connection
+    WS_Client -.->|Real-time| WS_Server
+    WS_Server -.->|Price Updates| WS_Client
+
+    %% Backend to External APIs
+    Express --> CoinGecko
+    Express --> NewsData
+    Express --> Sentiment
+    UI --> TradingView
+
+    %% Caching
+    Express --> Cache
+    Cache --> Express
+
+    %% Local Storage
+    Services --> LocalStorage
+    LocalStorage --> Services
+
+    style UI fill:#ff6b6b
+    style Express fill:#45b7d1
+    style Vite fill:#96ceb4
+    style Cache fill:#ffa726

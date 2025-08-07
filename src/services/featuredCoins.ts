@@ -79,6 +79,10 @@ class FeaturedCoinsService {
       });
       
       if (!response.ok) {
+        if (response.status === 429) {
+          console.log('Rate limited, returning empty results');
+          return [];
+        }
         throw new Error('Search failed');
       }
       
@@ -91,7 +95,7 @@ class FeaturedCoinsService {
       }));
     } catch (error) {
       console.error('Error searching coins:', error);
-      return [];
+      return []; // Return empty array instead of throwing
     }
   }
 }
