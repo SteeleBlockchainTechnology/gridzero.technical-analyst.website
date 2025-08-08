@@ -78,8 +78,8 @@ app.get('/api/verification-failed', (req, res) => {
   res.status(403).json({ error: 'Verification failed. Ensure you have the Premium Access role in the Discord server.' });
 });
 
-app.get('/api/auth/reset', (req, res) => {
-  req.logout((err: any) => {
+app.get('/api/auth/reset', (_req, res) => {
+  _req.logout((err: any) => {
     if (err) return res.status(500).json({ error: 'Reset failed.' });
     res.redirect('/');
   });
@@ -136,8 +136,8 @@ const newsDataLimiter = new RateLimiter(RATE_LIMITS.NEWSDATA.REQUEST_DELAY);
 const NEWSDATA_API = 'https://newsdata.io/api/1/news';
 const NEWSDATA_API_KEY = process.env.VITE_NEWSDATA_API_KEY;
 const NEWS_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes - longer cache
-let lastNewsRequest = 0;
-const NEWS_REQUEST_DELAY = 12000; // 12 seconds between requests
+// let lastNewsRequest = 0; // Unused rate limit tracker
+// const NEWS_REQUEST_DELAY = 12000; // Unused delay constant
 
 // Add news endpoint with proper error handling and rate limiting
 app.get('/api/news/:crypto', ensureVerified, async (req: Request, res: Response) => {
@@ -253,7 +253,7 @@ function analyzeSentiment(text: string): string {
   };
 
   let multiplier = 1;
-  words.forEach((word, index) => {
+  words.forEach((word) => {
     // Check for multipliers
     if (multipliers[word as keyof typeof multipliers]) {
       multiplier = multipliers[word as keyof typeof multipliers];
@@ -295,8 +295,8 @@ const CACHE_DURATION = {
 };
 
 // Rate limiting for CoinGecko
-let lastCoinGeckoRequest = 0;
-const COINGECKO_REQUEST_DELAY = 10000; // 10 seconds between requests - more conservative
+// let lastCoinGeckoRequest = 0; // Unused
+// const COINGECKO_REQUEST_DELAY = 10000; // Unused
 
 // Cache implementation
 interface CacheEntry {
@@ -795,7 +795,7 @@ app.listen(PORT, '0.0.0.0', () => {
 });
 
 // Error handling
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error('Server error:', err);
   res.status(500).json({ error: 'Internal server error' });
 });

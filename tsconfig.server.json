@@ -1,12 +1,19 @@
 {
-  "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist/server",
     "target": "ES2020",
-    "module": "CommonJS",
+    "module": "ES2020",
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "strict": false,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": false,
+    "emitDeclarationOnly": false,
+    "allowImportingTsExtensions": false,
+    "resolveJsonModule": true,
+    "isolatedModules": false
   },
   "include": ["src/server/**/*"],
   "exclude": ["src/components/**/*", "src/hooks/**/*", "src/lib/**/*", "src/services/**/*", "src/App.tsx", "src/main.tsx", "src/index.css", "src/vite-env.d.ts"]
