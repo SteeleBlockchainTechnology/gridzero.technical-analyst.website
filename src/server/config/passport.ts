@@ -4,6 +4,12 @@ import axios from 'axios';
 
 // Initialize passport configuration
 export function initializePassport() {
+  console.log('=== PASSPORT INITIALIZATION START ===');
+  console.log('DISCORD_CLIENT_ID:', process.env.DISCORD_CLIENT_ID);
+  console.log('DISCORD_CLIENT_SECRET exists:', !!process.env.DISCORD_CLIENT_SECRET);
+  console.log('HOST:', process.env.HOST);
+  console.log('=== CONFIGURING PASSPORT ===');
+
   // Serialize user for session storage
   passport.serializeUser((user: any, done) => {
     console.log('Serializing user:', user);
@@ -16,6 +22,7 @@ export function initializePassport() {
     done(null, obj);
   });
 
+  console.log('Creating Discord strategy...');
   passport.use(new DiscordStrategy({
     clientID: process.env.DISCORD_CLIENT_ID!,
     clientSecret: process.env.DISCORD_CLIENT_SECRET!,
@@ -97,5 +104,7 @@ export function initializePassport() {
     }
   }));
 
+  console.log('Discord strategy created successfully');
+  console.log('=== PASSPORT INITIALIZATION COMPLETE ===');
   return passport;
 }

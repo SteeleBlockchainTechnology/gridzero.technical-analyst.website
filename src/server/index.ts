@@ -16,10 +16,27 @@ const __dirname = path.dirname(__filename);
 // Load environment variables first
 dotenv.config();
 
+console.log('=== SERVER STARTUP DEBUG ===');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('HOST:', process.env.HOST);
+console.log('SESSION_SECRET exists:', !!process.env.SESSION_SECRET);
+console.log('DISCORD_CLIENT_ID:', process.env.DISCORD_CLIENT_ID);
+console.log('DISCORD_BOT_TOKEN exists:', !!process.env.DISCORD_BOT_TOKEN);
+console.log('DISCORD_GUILD_ID:', process.env.DISCORD_GUILD_ID);
+console.log('=== END STARTUP DEBUG ===');
+
 // Import passport after environment variables are loaded
 import { initializePassport } from './config/passport.js';
 
-const passport = initializePassport();
+console.log('Initializing passport...');
+let passport;
+try {
+  passport = initializePassport();
+  console.log('Passport initialized successfully');
+} catch (error) {
+  console.error('Failed to initialize passport:', error);
+  process.exit(1);
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -71,7 +88,12 @@ const ensureVerified = (req: any, res: Response, next: NextFunction) => {
 // Authentication Routes
 app.get('/api/auth/discord', passport.authenticate('discord'));
 
-app.get('/api/auth/discord/callback', passport.authenticate('discord', {
+app.get('/api/auth/discord/callback', (req, res, next) => {
+  console.log('=== DISCORD CALLBACK HIT ===');
+  console.log('Query params:', req.query);
+  console.log('Session before auth:', req.sessionID);
+  next();
+}, passport.authenticate('discord', {
   failureRedirect: '/verification-failed',
   successRedirect: process.env.NODE_ENV === 'production' 
     ? `https://${process.env.HOST}`
