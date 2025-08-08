@@ -9,16 +9,33 @@ import session from 'express-session';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-console.log('Loaded SESSION_SECRET:', process.env.SESSION_SECRET);
-console.log('Loaded DISCORD_CLIENT_ID:', process.env.DISCORD_CLIENT_ID);
-console.log('Loaded DISCORD_PREMIUM_ROLE_ID:', process.env.DISCORD_PREMIUM_ROLE_ID);
-
 // ESM-compatible __dirname and __filename
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables first
-dotenv.config();
+// Load environment variables first - try production first, then fallback to .env
+const envPath = process.env.NODE_ENV === 'production' 
+  ? path.resolve(__dirname, '../../.env.production')
+  : path.resolve(__dirname, '../../.env');
+
+dotenv.config({ path: envPath });
+// Also try loading .env as fallback
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+
+console.log('=== ENVIRONMENT VARIABLES DEBUG ===');
+console.log('Loaded env file:', envPath);
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('HOST:', process.env.HOST);
+console.log('DISCORD_CLIENT_ID:', process.env.DISCORD_CLIENT_ID ? 'SET' : 'MISSING');
+console.log('DISCORD_CLIENT_SECRET:', process.env.DISCORD_CLIENT_SECRET ? 'SET' : 'MISSING');
+console.log('DISCORD_GUILD_ID:', process.env.DISCORD_GUILD_ID);
+console.log('DISCORD_PREMIUM_ROLE_ID:', process.env.DISCORD_PREMIUM_ROLE_ID);
+console.log('DISCORD_CALLBACK_URL:', process.env.DISCORD_CALLBACK_URL);
+console.log('SESSION_SECRET:', process.env.SESSION_SECRET ? 'SET' : 'MISSING');
+console.log('=======================================');
+
+// Import passport after environment variables are loaded
+import { initializePassport } from './config/passport.js';
 
 console.log('=== SERVER STARTUP DEBUG ===');
 console.log('NODE_ENV:', process.env.NODE_ENV);
@@ -28,9 +45,6 @@ console.log('DISCORD_CLIENT_ID:', process.env.DISCORD_CLIENT_ID);
 console.log('DISCORD_BOT_TOKEN exists:', !!process.env.DISCORD_BOT_TOKEN);
 console.log('DISCORD_GUILD_ID:', process.env.DISCORD_GUILD_ID);
 console.log('=== END STARTUP DEBUG ===');
-
-// Import passport after environment variables are loaded
-import { initializePassport } from './config/passport.js';
 
 console.log('Initializing passport...');
 let passport;
