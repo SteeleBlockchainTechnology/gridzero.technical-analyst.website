@@ -9,6 +9,10 @@ import session from 'express-session';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+console.log('Loaded SESSION_SECRET:', process.env.SESSION_SECRET);
+console.log('Loaded DISCORD_CLIENT_ID:', process.env.DISCORD_CLIENT_ID);
+console.log('Loaded DISCORD_PREMIUM_ROLE_ID:', process.env.DISCORD_PREMIUM_ROLE_ID);
+
 // ESM-compatible __dirname and __filename
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
