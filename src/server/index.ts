@@ -76,7 +76,16 @@ app.get('/api/auth/discord/callback', passport.authenticate('discord', {
 }));
 
 app.get('/api/check-verification', (req, res) => {
-  res.json({ verified: req.isAuthenticated() && req.user && (req.user as any).verified });
+  console.log('=== VERIFICATION CHECK ===');
+  console.log('Session ID:', req.sessionID);
+  console.log('Is authenticated:', req.isAuthenticated());
+  console.log('User object:', req.user);
+  console.log('Session data:', req.session);
+  
+  const isVerified = req.isAuthenticated() && req.user && (req.user as any).verified;
+  console.log('Final verification status:', isVerified);
+  
+  res.json({ verified: isVerified });
 });
 
 app.get('/api/verification-failed', (req, res) => {
