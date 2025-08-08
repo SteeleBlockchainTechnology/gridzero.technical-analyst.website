@@ -6,6 +6,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import type { Request, Response, NextFunction } from 'express';
 import http from 'http';
 import session from 'express-session';
+import path from 'path';
 
 // Load environment variables first
 dotenv.config();
@@ -17,17 +18,13 @@ const passport = initializePassport();
 
 const app = express();
 const server = http.createServer(app);
-const PORT = process.env.VITE_PORT || 3001;
+const PORT = parseInt(process.env.VITE_PORT || '3001', 10);
 
 // CORS configuration
 app.use(cors({
-  origin: [
-    'http://localhost:5173',  // Frontend dev server
-    'http://localhost:3001',  // Backend dev server
-    process.env.NODE_ENV === 'production' 
-      ? `http://${process.env.HOST || 'your-linux-server-ip'}:5173`  // Production frontend
-      : 'http://localhost:5173'
-  ],
+  origin: process.env.NODE_ENV === 'production' 
+    ? [`https://${process.env.HOST}`, `https://www.${process.env.HOST}`]
+    : ['http://localhost:5173', 'http://localhost:3001'],
   methods: ['GET', 'POST', 'OPTIONS'],
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -49,6 +46,13 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Serve static files in production
+if (process.env.NODE_ENV === 'production') {
+  // Serve static files from the built frontend
+  app.use(express.static(path.join(__dirname, '../../dist')));
+  console.log(`📁 Serving static files from: ${path.join(__dirname, '../../dist')}`);
+}
+
 const ensureVerified = (req: any, res: Response, next: NextFunction) => {
   if (!req.isAuthenticated() || !(req.user as any).verified) {
     return res.status(401).json({ error: 'Verification required. Please verify your Premium Access role.' });
@@ -61,7 +65,9 @@ app.get('/api/auth/discord', passport.authenticate('discord'));
 
 app.get('/api/auth/discord/callback', passport.authenticate('discord', {
   failureRedirect: '/verification-failed',
-  successRedirect: 'http://localhost:5173'  // Direct redirect to frontend
+  successRedirect: process.env.NODE_ENV === 'production' 
+    ? `https://${process.env.HOST}`
+    : 'http://localhost:5173'
 }));
 
 app.get('/api/check-verification', (req, res) => {
@@ -635,13 +641,13 @@ app.get('/api/crypto/history/:id', ensureVerified, async (req: Request, res: Res
       prices: prices.map((item: [number, number]) => item[1]).slice(-200), // Last 200 data points
       volumes: volumes.length > 0 ? volumes.map((item: [number, number]) => item[1]).slice(-200) : [],
       timestamps: prices.map((item: [number, number]) => item[0]).slice(-200),
-      current_price: prices.length > 0 ? prices[prices.length - 1][1] : 0,
+      // Remove current_price - it should come from price store
       market_cap: marketCaps.length > 0 ? marketCaps[marketCaps.length - 1][1] : 0,
       price_change_24h: calculatePriceChange(prices),
       total_volume: volumes.length > 0 ? volumes[volumes.length - 1][1] : 0
     };
 
-    console.log(`Processed data - Prices: ${processedData.prices.length}, Volumes: ${processedData.volumes.length}, Current Price: ${processedData.current_price}`);
+    console.log(`Processed data - Prices: ${processedData.prices.length}, Volumes: ${processedData.volumes.length}`);
 
     // Cache the result
     cache.set(cacheKey, {
@@ -650,7 +656,6 @@ app.get('/api/crypto/history/:id', ensureVerified, async (req: Request, res: Res
     });
 
     console.log(`Successfully fetched and processed historical data for ${id}`);
-    console.log(`Current price: ${processedData.current_price}`);
     console.log(`24h change: ${processedData.price_change_24h}`);
     
     return res.json(processedData);
@@ -674,7 +679,7 @@ app.get('/api/crypto/history/:id', ensureVerified, async (req: Request, res: Res
       prices: [],
       volumes: [],
       timestamps: [],
-      current_price: 0,
+      // Remove current_price from fallback data
       market_cap: 0,
       price_change_24h: 0,
       total_volume: 0,
@@ -765,17 +770,27 @@ wss.on('connection', (ws: WebSocket) => {
   });
 });
 
+// Handle React Router (serve index.html for all non-API routes) - Production only
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api') && !req.path.startsWith('/ws')) {
+      res.sendFile(path.join(__dirname, '../../dist/index.html'));
+    }
+  });
+}
+
 // Start server
-server.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   const environment = process.env.NODE_ENV || 'development';
   const host = process.env.HOST || 'localhost';
   const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-  
+
   if (environment === 'development') {
     console.log(`🚀 Development Server running at http://localhost:${PORT}`);
     console.log(`📊 Frontend running at http://localhost:5173`);
   } else {
     console.log(`🚀 Production Server running at ${protocol}://${host}:${PORT}`);
+    console.log(`📊 Frontend available at ${protocol}://${host}`);
   }
 });
 

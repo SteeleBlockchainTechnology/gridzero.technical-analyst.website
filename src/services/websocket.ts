@@ -15,8 +15,9 @@ class WebSocketService {
   private lastPriceUpdate: number = 0;
   private PRICE_UPDATE_THRESHOLD = 10000; // 10 seconds
 
-  async connect() {
-    if (this.isConnecting || this.ws?.readyState === WebSocket.OPEN) return;
+  private connect(): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
+    
     this.isConnecting = true;
 
     try {
@@ -25,7 +26,12 @@ class WebSocketService {
         clearInterval(this.heartbeatInterval);
       }
 
-      this.ws = new WebSocket(`ws://crypto-sensei.vercel.app:3001`);
+      // Use environment-based WebSocket URL
+      const wsUrl = process.env.NODE_ENV === 'production'
+        ? `wss://${window.location.host}`
+        : `ws://localhost:3001`;
+      
+      this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
         console.log('WebSocket connected successfully');

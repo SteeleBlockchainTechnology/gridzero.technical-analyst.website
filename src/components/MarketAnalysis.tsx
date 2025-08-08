@@ -4,6 +4,7 @@ import { analysisService } from '../services/analysis';
 import { motion } from 'framer-motion';
 import { PredictionData } from '@/services/types';
 import { ErrorDisplay } from './ErrorBoundary';
+import { priceStore, PriceData } from '../services/priceStore';
 
 interface MarketAnalysisProps {
   crypto: string;
@@ -166,11 +167,26 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto, predicti
   const [analysis, setAnalysis] = useState<AnalysisData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPrice, setCurrentPrice] = useState<PriceData | null>(null);
+
+  // Subscribe to price store updates
+  useEffect(() => {
+    if (!crypto) return;
+
+    const unsubscribe = priceStore.subscribe('market-analysis', (cryptoId, priceData) => {
+      if (cryptoId === crypto) {
+        setCurrentPrice(priceData);
+      }
+    });
+
+    return unsubscribe;
+  }, [crypto]);
 
   const fetchAnalysis = async () => {
     try {
       setLoading(true);
       setError(null);
+      
       const result = await analysisService.getDetailedAnalysis(crypto);
       if (!result) {
         throw new Error('No analysis data available');
@@ -216,7 +232,7 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto, predicti
 
   useEffect(() => {
     fetchAnalysis();
-  }, [crypto, predictions]); // Only depend on crypto and predictions changes
+  }, [crypto, predictions, currentPrice]); // Include currentPrice as dependency
 
   if (loading) {
     const loadingSteps = [

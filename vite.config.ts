@@ -18,6 +18,20 @@ export default defineConfig({
       }
     },
   },
+  build: {
+    outDir: 'dist',
+    sourcemap: false, // Disable for production
+    minify: 'terser',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          charts: ['recharts'],
+          analysis: ['axios']
+        }
+      }
+    }
+  },
   define: {
     'process.env': {},
   },

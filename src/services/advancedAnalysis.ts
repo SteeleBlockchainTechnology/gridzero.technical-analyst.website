@@ -3,6 +3,7 @@ import * as tf from '@tensorflow/tfjs';
 import { mlModels } from './ml/models';
 import { strategyGenerator } from './strategy/strategyGenerator';
 import { TechnicalSignals } from './types';
+import { priceStore } from './priceStore';
 
 // Export the interface
 export interface AdvancedAnalysis {
@@ -993,6 +994,9 @@ class AdvancedAnalysisService {
 
   async getFullAnalysis(crypto: string): Promise<AdvancedAnalysis> {
     try {
+      // Get current price from centralized price store  
+      const priceData = await priceStore.getPrice(crypto);
+      
       // Fetch historical data
       const historicalData = await api.getHistoricalData(crypto);
       console.log('Raw Historical Data:', historicalData);
@@ -1003,13 +1007,13 @@ class AdvancedAnalysisService {
         return this.getDefaultAnalysis(crypto);
       }
 
-      // Process the data
+      // Process the data - use price from price store
       const processedData = {
         prices: historicalData.prices,
         volumes: historicalData.volumes || Array(historicalData.prices.length).fill(0),
-        current_price: historicalData.current_price || historicalData.prices[historicalData.prices.length - 1] || 0,
+        current_price: priceData.price, // Use price from centralized store
         market_cap: historicalData.market_cap || 0,
-        price_change_24h: historicalData.price_change_24h || 0
+        price_change_24h: priceData.change24h // Use change24h from centralized store
       };
 
       // Validate processed data

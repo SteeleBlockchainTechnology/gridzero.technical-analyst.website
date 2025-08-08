@@ -72,7 +72,7 @@ export const api = {
         prices: response.data.prices || [],
         volumes: response.data.volumes || [],
         timestamps: response.data.timestamps || [],
-        current_price: response.data.current_price || 0,
+        // Remove current_price - it should come from price store
         market_cap: response.data.market_cap || 0,
         price_change_24h: response.data.price_change_24h || 0,
         total_volume: response.data.total_volume || 0
@@ -97,7 +97,7 @@ export const api = {
         prices: [],
         volumes: [],
         timestamps: [],
-        current_price: 0,
+        // Remove current_price from fallback data
         market_cap: 0,
         price_change_24h: 0,
         total_volume: 0

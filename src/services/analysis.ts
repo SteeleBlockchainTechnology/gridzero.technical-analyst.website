@@ -1,5 +1,6 @@
 import Groq from "groq-sdk";
 import { api } from "./api";
+import { priceStore } from "./priceStore";
 
 const groq = new Groq({
   apiKey: import.meta.env.VITE_GROQ_API_KEY,
@@ -497,10 +498,14 @@ class AnalysisService {
 
   async getDetailedAnalysis(crypto: string): Promise<DetailedAnalysis> {
     try {
+      // Get current price from centralized price store
+      const priceData = await priceStore.getPrice(crypto);
+      const currentPrice = priceData.price;
+      
       const historicalData = await this.getHistoricalData(crypto);
       const prices = historicalData.prices;
       const volumes = historicalData.volumes;
-      const currentPrice = historicalData.current_price;
+      // Use currentPrice from price store instead of historicalData.current_price
 
       // Calculate all technical indicators
       const rsi = this.calculateRSI(prices);
