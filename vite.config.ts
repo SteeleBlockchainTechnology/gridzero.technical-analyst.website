@@ -26,8 +26,8 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],
-          charts: ['recharts'],
-          analysis: ['axios']
+          ui: ['lucide-react', '@radix-ui/react-select', '@radix-ui/react-slot', '@radix-ui/react-switch'],
+          utils: ['axios', 'clsx', 'tailwind-merge']
         }
       }
     }
