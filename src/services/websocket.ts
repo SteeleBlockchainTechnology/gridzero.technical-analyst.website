@@ -1,4 +1,4 @@
-import { api } from './api'; // Import the api service
+import { priceStore } from './priceStore'; // Use price store instead of api directly
 
 type WebSocketCallback = (data: any) => void;
 
@@ -98,8 +98,8 @@ class WebSocketService {
           // Check if we need a new price update
           const now = Date.now();
           if (now - this.lastPriceUpdate > this.PRICE_UPDATE_THRESHOLD) {
-            // Get price from the existing API cache if available
-            const priceData = await api.getPrice(this.currentCrypto);
+            // Use price store instead of direct API calls
+            const priceData = await priceStore.getPrice(this.currentCrypto);
             
             const price = {
               price: priceData.price,

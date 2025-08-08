@@ -10,7 +10,8 @@ import { AdvancedAnalysis } from './components/AdvancedAnalysis'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import VerificationPage from './components/VerificationPage'
 import { api } from './services/api'
-import type { NewsItem, PredictionData, CryptoPrice, FeaturedCoin } from './services/types'
+import { priceStore } from './services/priceStore'
+import type { NewsItem, PredictionData, CryptoPrice } from './services/types'
 import { Coins, Clock} from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
@@ -63,8 +64,7 @@ function AppContent() {
     checkVerification();
   }, [location.pathname]);
 
-  // Your original useEffects - only run when verified
-  // Reset price when crypto changes and fetch new data
+  // Price management with centralized store - REPLACES old price fetching logic
   useEffect(() => {
     if (!isVerified) return;
 
@@ -75,35 +75,22 @@ function AppContent() {
       timestamp: Date.now()
     });
 
-    let priceInterval: NodeJS.Timeout;
+    // Subscribe to price updates from the centralized store
+    const unsubscribe = priceStore.subscribe('main-app', (cryptoId, priceData) => {
+      if (cryptoId === crypto) { // Only update if it's the current crypto
+        setPrice({
+          price: priceData.price,
+          change24h: priceData.change24h,
+          timestamp: priceData.timestamp
+        });
+      }
+    });
 
-    // Debounce the price fetch to avoid rapid API calls when switching coins
-    const fetchTimeout = setTimeout(async () => {
-      const fetchPriceData = async () => {
-        try {
-          const priceData = await api.getPrice(crypto);
-          // Only update if we get valid price data
-          if (priceData && priceData.price > 0) {
-            setPrice(priceData);
-          } else {
-            console.log(`No valid price data for ${crypto}, keeping loading state`);
-          }
-        } catch (error) {
-          console.error('Error fetching price data:', error);
-          // Don't reset price to 0 on error - keep loading state
-        }
-      };
-
-      await fetchPriceData();
-      // Increase interval to 2 minutes to reduce API pressure
-      priceInterval = setInterval(fetchPriceData, 120000);
-    }, 500); // 500ms debounce
+    // Set the active crypto (this will start fetching and manage intervals)
+    priceStore.setActiveCrypto(crypto);
 
     return () => {
-      clearTimeout(fetchTimeout);
-      if (priceInterval) {
-        clearInterval(priceInterval);
-      }
+      unsubscribe();
     };
   }, [crypto, isVerified]);
 

@@ -5,6 +5,9 @@ import Sentiment from 'sentiment';
 // Initialize sentiment analyzer as a singleton
 const sentimentAnalyzer = new Sentiment();
 
+// Import price store for centralized price management
+import { priceStore } from './priceStore';
+
 // API Configuration - Use backend routes instead of direct external calls
 const API_BASE = '/api';
 
@@ -42,65 +45,13 @@ const isValidCache = (key: string, type: keyof typeof CACHE_DURATION) => {
 
 export const api = {
   async getPrice(crypto: string): Promise<CryptoPrice> {
-    const cacheKey = `price-${crypto}`;
-    
-    if (isValidCache(cacheKey, 'PRICE')) {
-      return cache.get(cacheKey)!.data;
-    }
-
-    try {
-      // Use backend API route instead of direct external call
-      const response = await axios.get(`${API_BASE}/crypto/price/${crypto}`, {
-        withCredentials: true,
-        timeout: 15000 // 15 second timeout
-      });
-
-      const data = {
-        price: response.data.price || 0,
-        change24h: response.data.change24h || 0,
-        timestamp: Date.now()
-      };
-
-      // Only cache and return if we have valid price data
-      if (data.price > 0) {
-        cache.set(cacheKey, { data, timestamp: Date.now() });
-        return data;
-      } else {
-        // Try to return cached data if current price is 0
-        const cachedData = cache.get(cacheKey);
-        if (cachedData && cachedData.data.price > 0) {
-          console.log(`Invalid price data received, using cached price for ${crypto}`);
-          return cachedData.data;
-        }
-        return data; // Return the 0 price if no cache available
-      }
-    } catch (error: any) {
-      console.error('API error:', error);
-      
-      // Handle 429 rate limit errors by returning cached data if available
-      if (error.response?.status === 429) {
-        const cachedData = cache.get(cacheKey);
-        if (cachedData) {
-          console.log(`Rate limit hit, using cached price data for ${crypto}`);
-          return cachedData.data;
-        }
-        console.log(`Rate limit hit, no cached data available for ${crypto}`);
-      }
-      
-      // For any error, try to return cached data first
-      const cachedData = cache.get(cacheKey);
-      if (cachedData && cachedData.data.price > 0) {
-        console.log(`API error, using cached price data for ${crypto}`);
-        return cachedData.data;
-      }
-      
-      // Return fallback data if no cache available
-      return {
-        price: 0,
-        change24h: 0,
-        timestamp: Date.now()
-      };
-    }
+    // Use centralized price store instead of direct API calls
+    const priceData = await priceStore.getPrice(crypto);
+    return {
+      price: priceData.price,
+      change24h: priceData.change24h,
+      timestamp: priceData.timestamp
+    };
   },
 
   async getHistoricalData(crypto: string, days: number = 200) {
@@ -564,38 +515,22 @@ export const api = {
   },
 
   async getBatchPrices(coins: string[]): Promise<BatchPriceData> {
-    const cacheKey = `batch-prices-${coins.join('-')}`;
+    // Use centralized price store for batch operations
+    console.log(`API: Using price store for batch prices of ${coins.length} coins`);
+    const batchData = await priceStore.getBatchPrices(coins);
     
-    if (isValidCache(cacheKey, 'PRICE')) {
-      return cache.get(cacheKey)!.data;
-    }
-
-    try {
-      // Use backend batch API route instead of individual calls
-      const response = await axios.get(`${API_BASE}/crypto/prices`, {
-        params: { ids: coins.join(',') },
-        withCredentials: true
-      });
-
-      const batchData: BatchPriceData = response.data || {};
-      
-      cache.set(cacheKey, { data: batchData, timestamp: Date.now() });
-      return batchData;
-    } catch (error: any) {
-      console.error('Error fetching batch prices:', error);
-      
-      // Handle 429 rate limit errors by returning cached data if available
-      if (error.response?.status === 429) {
-        const cachedData = cache.get(cacheKey);
-        if (cachedData) {
-          console.log(`Rate limit hit, using cached batch prices for ${coins.join(', ')}`);
-          return cachedData.data;
-        }
-      }
-      
-      // Return empty object as fallback
-      return {};
-    }
+    // Convert to expected format
+    const result: BatchPriceData = {};
+    Object.entries(batchData).forEach(([coinId, priceData]) => {
+      result[coinId] = {
+        price: priceData.price,
+        change24h: priceData.change24h,
+        marketCap: 0, // This can be enhanced later if needed
+        timestamp: priceData.timestamp
+      };
+    });
+    
+    return result;
   },
 
   async getBatchHistoricalData(coins: string[], days: number = 200) {
