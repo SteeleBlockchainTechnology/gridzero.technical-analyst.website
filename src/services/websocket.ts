@@ -17,6 +17,7 @@ class WebSocketService {
 
   private connect(): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
+    if (this.isConnecting) return; // Prevent multiple connection attempts
     
     this.isConnecting = true;
 
@@ -129,6 +130,7 @@ class WebSocketService {
   }
 
   private handleReconnect() {
+    if (this.isConnecting) return; // Prevent multiple reconnection attempts
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
