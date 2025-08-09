@@ -44,20 +44,32 @@ function AppContent() {
 
   const timeframes = ['1H', '4H', '1D', '1W', '1M']
 
-  // Authentication check
+  // Authentication check with retry logic
   useEffect(() => {
-    const checkVerification = async () => {
+    const checkVerification = async (retryCount = 0) => {
       try {
+        console.log(`Checking verification... (attempt ${retryCount + 1})`);
         const response = await fetch('/api/check-verification', {
           credentials: 'include'
         });
         const data = await response.json();
+        console.log('Verification response:', data);
+        
         setIsVerified(data.verified);
+        
+        // If not verified and this is a redirect from OAuth, wait a bit and retry
+        if (!data.verified && retryCount < 3 && window.location.search.includes('code=')) {
+          console.log('OAuth redirect detected, retrying verification check...');
+          setTimeout(() => checkVerification(retryCount + 1), 1000);
+          return;
+        }
       } catch (error) {
         console.error('Error checking verification:', error);
         setIsVerified(false);
       } finally {
-        setLoading(false);
+        if (retryCount === 0) {
+          setLoading(false);
+        }
       }
     };
 

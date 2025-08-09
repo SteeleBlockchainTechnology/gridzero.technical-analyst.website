@@ -67,12 +67,15 @@ export function initializePassport() {
           username: profile.username,
           discriminator: profile.discriminator,
           verified: true,
-          premiumAccess: true
+          premiumAccess: true,
+          authenticatedAt: new Date().toISOString()
         };
         console.log('✅ User verified successfully:', verifiedUser);
         return done(null, verifiedUser);
       } else {
         console.log('❌ User does not have premium role');
+        console.log('Available roles:', memberRoles);
+        console.log('Required role:', process.env.DISCORD_PREMIUM_ROLE_ID);
         // Return false to indicate authentication failure
         return done(null, false, { 
           message: 'Premium Access role is required. Please contact an admin to get the Premium Access role in our Discord server.' 

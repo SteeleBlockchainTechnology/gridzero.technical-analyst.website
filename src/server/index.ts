@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import axios from 'axios';
-import * as dotenv from 'dotenv';
+import dotenv from 'dotenv';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Request, Response, NextFunction } from 'express';
 import http from 'http';
@@ -13,17 +13,22 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables first - try production first, then fallback to .env
-const envPath = process.env.NODE_ENV === 'production' 
-  ? path.resolve(__dirname, '../../.env.production')
-  : path.resolve(__dirname, '../../.env');
+// Load environment variables reliably - try multiple approaches
+console.log('=== LOADING ENVIRONMENT VARIABLES ===');
+console.log('Current NODE_ENV:', process.env.NODE_ENV);
 
-dotenv.config({ path: envPath });
-// Also try loading .env as fallback
+// Load .env first (fallback)
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
+// Then try production if in production mode
+if (process.env.NODE_ENV === 'production') {
+  dotenv.config({ path: path.resolve(__dirname, '../../.env.production') });
+}
+
+// Also try to load from working directory as fallback
+dotenv.config();
+
 console.log('=== ENVIRONMENT VARIABLES DEBUG ===');
-console.log('Loaded env file:', envPath);
 console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('HOST:', process.env.HOST);
 console.log('DISCORD_CLIENT_ID:', process.env.DISCORD_CLIENT_ID ? 'SET' : 'MISSING');
@@ -32,6 +37,25 @@ console.log('DISCORD_GUILD_ID:', process.env.DISCORD_GUILD_ID);
 console.log('DISCORD_PREMIUM_ROLE_ID:', process.env.DISCORD_PREMIUM_ROLE_ID);
 console.log('DISCORD_CALLBACK_URL:', process.env.DISCORD_CALLBACK_URL);
 console.log('SESSION_SECRET:', process.env.SESSION_SECRET ? 'SET' : 'MISSING');
+
+// Validate critical environment variables
+const requiredEnvVars = [
+  'DISCORD_CLIENT_ID',
+  'DISCORD_CLIENT_SECRET', 
+  'DISCORD_BOT_TOKEN',
+  'DISCORD_GUILD_ID',
+  'DISCORD_PREMIUM_ROLE_ID',
+  'SESSION_SECRET'
+];
+
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+if (missingVars.length > 0) {
+  console.error('❌ CRITICAL: Missing required environment variables:', missingVars);
+  console.error('Server cannot start without these variables. Check your .env file.');
+  process.exit(1);
+}
+
+console.log('✅ All required environment variables are set');
 console.log('=======================================');
 
 // Import passport after environment variables are loaded
@@ -81,9 +105,13 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production', // HTTPS required in production
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'lax' // Important for OAuth callbacks
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-site OAuth in production
+    domain: process.env.NODE_ENV === 'production' ? process.env.HOST : undefined // Set domain in production
   },
-  name: 'gridzero.session' // Custom session name
+  name: 'gridzero.session', // Custom session name
+  // Enhanced session persistence
+  rolling: true, // Reset expiration on each request
+  proxy: process.env.NODE_ENV === 'production' // Trust proxy in production
 }));
 
 app.use(passport.initialize());
@@ -109,14 +137,33 @@ app.get('/api/auth/discord', passport.authenticate('discord'));
 app.get('/api/auth/discord/callback', (req, res, next) => {
   console.log('=== DISCORD CALLBACK HIT ===');
   console.log('Query params:', req.query);
-  console.log('Session before auth:', req.sessionID);
+  console.log('Session ID before auth:', req.sessionID);
+  console.log('Session data before auth:', req.session);
   next();
 }, passport.authenticate('discord', {
-  failureRedirect: '/verification-failed',
-  successRedirect: process.env.NODE_ENV === 'production' 
-    ? `https://${process.env.HOST}`
-    : 'http://localhost:5173'
-}));
+  failureRedirect: '/verification-failed'
+}), (req, res) => {
+  // Custom success handler to ensure session is saved before redirect
+  console.log('=== AUTHENTICATION SUCCESS ===');
+  console.log('Session ID after auth:', req.sessionID);
+  console.log('User after auth:', req.user);
+  console.log('Session data after auth:', req.session);
+  
+  // Save session explicitly before redirect
+  req.session.save((err) => {
+    if (err) {
+      console.error('Session save error:', err);
+      return res.redirect('/verification-failed');
+    }
+    
+    console.log('Session saved successfully, redirecting...');
+    const redirectUrl = process.env.NODE_ENV === 'production' 
+      ? `https://${process.env.HOST}`
+      : 'http://localhost:5173';
+    
+    res.redirect(redirectUrl);
+  });
+});
 
 app.get('/api/check-verification', (req, res) => {
   console.log('=== VERIFICATION CHECK ===');
