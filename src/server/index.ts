@@ -105,8 +105,8 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production', // HTTPS required in production
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-site OAuth in production
-    domain: process.env.NODE_ENV === 'production' ? process.env.HOST : undefined // Set domain in production
+    sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'lax', // Use 'lax' for same-site OAuth
+    domain: process.env.NODE_ENV === 'production' ? '.gridzero.xyz' : undefined // Use subdomain-compatible domain
   },
   name: 'gridzero.session', // Custom session name
   // Enhanced session persistence
@@ -149,19 +149,38 @@ app.get('/api/auth/discord/callback', (req, res, next) => {
   console.log('User after auth:', req.user);
   console.log('Session data after auth:', req.session);
   
-  // Save session explicitly before redirect
-  req.session.save((err) => {
+  // Force session regeneration for security and persistence
+  req.session.regenerate((err) => {
     if (err) {
-      console.error('Session save error:', err);
+      console.error('Session regeneration error:', err);
       return res.redirect('/verification-failed');
     }
     
-    console.log('Session saved successfully, redirecting...');
-    const redirectUrl = process.env.NODE_ENV === 'production' 
-      ? `https://${process.env.HOST}`
-      : 'http://localhost:5173';
-    
-    res.redirect(redirectUrl);
+    // Re-login the user after regeneration
+    req.logIn(req.user!, (err) => {
+      if (err) {
+        console.error('Re-login error:', err);
+        return res.redirect('/verification-failed');
+      }
+      
+      console.log('User re-logged in after session regeneration');
+      console.log('New session ID:', req.sessionID);
+      
+      // Save session explicitly before redirect
+      req.session.save((err) => {
+        if (err) {
+          console.error('Session save error:', err);
+          return res.redirect('/verification-failed');
+        }
+        
+        console.log('Session saved successfully, redirecting...');
+        const redirectUrl = process.env.NODE_ENV === 'production' 
+          ? `https://${process.env.HOST}`
+          : 'http://localhost:5173';
+        
+        res.redirect(redirectUrl);
+      });
+    });
   });
 });
 

@@ -58,22 +58,32 @@ function AppContent() {
         setIsVerified(data.verified);
         
         // If not verified and this is a redirect from OAuth, wait a bit and retry
-        if (!data.verified && retryCount < 3 && window.location.search.includes('code=')) {
+        if (!data.verified && retryCount < 5 && (window.location.search.includes('code=') || window.location.search.includes('oauth'))) {
           console.log('OAuth redirect detected, retrying verification check...');
-          setTimeout(() => checkVerification(retryCount + 1), 1000);
+          setTimeout(() => checkVerification(retryCount + 1), 2000); // Increased delay to 2 seconds
           return;
         }
       } catch (error) {
         console.error('Error checking verification:', error);
         setIsVerified(false);
       } finally {
-        if (retryCount === 0) {
+        if (retryCount === 0 || retryCount >= 5) {
           setLoading(false);
         }
       }
     };
 
     checkVerification();
+    
+    // Also check if we just returned from OAuth
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('code')) {
+      console.log('OAuth code detected in URL, clearing URL and re-checking verification');
+      // Clear the OAuth parameters from URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // Force a recheck after clearing URL
+      setTimeout(() => checkVerification(), 1000);
+    }
   }, [location.pathname]);
 
   // Price management with centralized store - REPLACES old price fetching logic
