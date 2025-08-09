@@ -106,7 +106,8 @@ app.use(session({
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'lax', // Use 'lax' for same-site OAuth
-    domain: process.env.NODE_ENV === 'production' ? '.gridzero.xyz' : undefined // Use subdomain-compatible domain
+    // Remove domain restriction to fix cookie issues
+    // domain: process.env.NODE_ENV === 'production' ? '.gridzero.xyz' : undefined
   },
   name: 'gridzero.session', // Custom session name
   // Enhanced session persistence
@@ -190,11 +191,23 @@ app.get('/api/check-verification', (req, res) => {
   console.log('Is authenticated:', req.isAuthenticated());
   console.log('User object:', req.user);
   console.log('Session data:', req.session);
+  console.log('Request headers:', req.headers);
+  console.log('Cookies:', req.headers.cookie);
   
   const isVerified = req.isAuthenticated() && req.user && (req.user as any).verified;
   console.log('Final verification status:', isVerified);
   
-  res.json({ verified: isVerified });
+  res.json({ 
+    verified: isVerified,
+    debug: {
+      sessionId: req.sessionID,
+      isAuthenticated: req.isAuthenticated(),
+      hasUser: !!req.user,
+      userVerified: req.user ? (req.user as any).verified : false,
+      sessionExists: !!req.session,
+      cookies: req.headers.cookie || 'No cookies'
+    }
+  });
 });
 
 app.get('/api/verification-failed', (req, res) => {
@@ -205,6 +218,38 @@ app.get('/api/auth/reset', (_req, res) => {
   _req.logout((err: any) => {
     if (err) return res.status(500).json({ error: 'Reset failed.' });
     res.redirect('/');
+  });
+});
+
+// Session test endpoint for debugging
+app.get('/api/session-test', (req, res) => {
+  console.log('=== SESSION TEST ===');
+  console.log('Session ID:', req.sessionID);
+  console.log('Session data:', req.session);
+  console.log('Cookies received:', req.headers.cookie);
+  
+  // Test session persistence
+  const session = req.session as any;
+  if (!session.testValue) {
+    session.testValue = 'test-' + Date.now();
+    console.log('Created test session value:', session.testValue);
+  } else {
+    console.log('Found existing test session value:', session.testValue);
+  }
+  
+  req.session.save((err) => {
+    if (err) {
+      console.error('Session save error in test:', err);
+      return res.status(500).json({ error: 'Session save failed', sessionId: req.sessionID });
+    }
+    
+    res.json({
+      sessionId: req.sessionID,
+      testValue: session.testValue,
+      isAuthenticated: req.isAuthenticated(),
+      user: req.user,
+      message: 'Session test completed'
+    });
   });
 });
 
