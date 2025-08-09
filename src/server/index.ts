@@ -105,11 +105,12 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production', // HTTPS required in production
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'lax', // Use 'lax' for same-site OAuth
-    // Remove domain restriction to fix cookie issues
-    // domain: process.env.NODE_ENV === 'production' ? '.gridzero.xyz' : undefined
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Use 'none' for cross-origin OAuth in production
+    // Explicitly set path and domain for production
+    path: '/',
+    domain: process.env.NODE_ENV === 'production' ? 'ta.gridzero.xyz' : undefined
   },
-  name: 'gridzero.session', // Custom session name
+  name: 'connect.sid', // Use default session name for better compatibility
   // Enhanced session persistence
   rolling: true, // Reset expiration on each request
   proxy: process.env.NODE_ENV === 'production' // Trust proxy in production
@@ -117,6 +118,19 @@ app.use(session({
 
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Cookie debugging middleware
+app.use((req, res, next) => {
+  console.log('=== COOKIE DEBUG ===');
+  console.log('URL:', req.url);
+  console.log('Cookie header:', req.headers.cookie);
+  console.log('Session ID:', req.sessionID);
+  console.log('Session data:', req.session);
+  console.log('Is authenticated:', req.isAuthenticated ? req.isAuthenticated() : 'No method');
+  console.log('User:', req.user);
+  console.log('=== END COOKIE DEBUG ===');
+  next();
+});
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
