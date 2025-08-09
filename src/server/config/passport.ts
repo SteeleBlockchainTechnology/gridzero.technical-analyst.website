@@ -71,6 +71,14 @@ export function initializePassport() {
           authenticatedAt: new Date().toISOString()
         };
         console.log('✅ User verified successfully:', verifiedUser);
+        
+        // Save session explicitly after setting user data
+        if ((done as any).req && (done as any).req.session) {
+          (done as any).req.session.save((err: any) => {
+            if (err) console.error('Session Save Error:', err);
+          });
+        }
+        
         return done(null, verifiedUser);
       } else {
         console.log('❌ User does not have premium role');

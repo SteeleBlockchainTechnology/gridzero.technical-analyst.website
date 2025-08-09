@@ -84,6 +84,9 @@ const app = express();
 const server = http.createServer(app);
 const PORT = parseInt(process.env.VITE_PORT || '3001', 10);
 
+// Trust proxy for Nginx/reverse proxy setup
+app.set('trust proxy', 1);
+
 // CORS configuration
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
@@ -105,8 +108,7 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production', // HTTPS required in production
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Use 'none' for cross-origin OAuth in production
-    // Explicitly set path and domain for production
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Use 'none' for cross-site HTTPS
     path: '/',
     domain: process.env.NODE_ENV === 'production' ? 'ta.gridzero.xyz' : undefined
   },
@@ -201,9 +203,9 @@ app.get('/api/auth/discord/callback', (req, res, next) => {
 
 app.get('/api/check-verification', (req, res) => {
   console.log('=== VERIFICATION CHECK ===');
+  console.log('Auth Check: isAuthenticated', req.isAuthenticated());
+  console.log('User:', req.user);
   console.log('Session ID:', req.sessionID);
-  console.log('Is authenticated:', req.isAuthenticated());
-  console.log('User object:', req.user);
   console.log('Session data:', req.session);
   console.log('Request headers:', req.headers);
   console.log('Cookies:', req.headers.cookie);
@@ -214,11 +216,11 @@ app.get('/api/check-verification', (req, res) => {
   res.json({ 
     verified: isVerified,
     debug: {
+      sessionExists: !!req.session,
       sessionId: req.sessionID,
       isAuthenticated: req.isAuthenticated(),
       hasUser: !!req.user,
       userVerified: req.user ? (req.user as any).verified : false,
-      sessionExists: !!req.session,
       cookies: req.headers.cookie || 'No cookies'
     }
   });
