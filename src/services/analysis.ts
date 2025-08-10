@@ -92,7 +92,8 @@ class AnalysisService {
     let data = await this.getHistoricalData(crypto, days);
     if (Array.isArray(data?.prices) && data.prices.length >= this.MIN_HISTORY_POINTS) return data;
     while (Date.now() - start < maxWaitMs) {
-      await new Promise(r => setTimeout(r, 300));
+  await new Promise(r => setTimeout(r, 500));
+  console.warn(`[analysis] Waiting for history readiness for ${crypto}...`);
       data = await this.getHistoricalData(crypto, days);
       if (Array.isArray(data?.prices) && data.prices.length >= this.MIN_HISTORY_POINTS) return data;
     }

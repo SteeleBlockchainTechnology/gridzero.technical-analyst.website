@@ -803,9 +803,11 @@ app.get('/api/crypto/history/:id', ensureVerified, async (req: Request, res: Res
         console.log(`Rate limited, using cached historical data for ${id}`);
         return res.json(cached.data);
       }
+      // Provide a concrete retryAfter hint for clients to back off
+      const retryAfterSec = Math.ceil(coinGeckoLimiter.getWaitTime() / 1000) || 6;
       return res.status(429).json({ 
         error: 'CoinGecko API rate limit exceeded. Please try again later.',
-        retryAfter: 30
+        retryAfter: retryAfterSec
       });
     }
 
@@ -838,10 +840,11 @@ app.get('/api/crypto/history/:id', ensureVerified, async (req: Request, res: Res
 
     console.log(`Raw data lengths - Prices: ${prices.length}, Volumes: ${volumes.length}, Market Caps: ${marketCaps.length}`);
 
+    const clamp = 180; // reduce payload to ease rate/size
     const processedData = {
-      prices: prices.map((item: [number, number]) => item[1]).slice(-200), // Last 200 data points
-      volumes: volumes.length > 0 ? volumes.map((item: [number, number]) => item[1]).slice(-200) : [],
-      timestamps: prices.map((item: [number, number]) => item[0]).slice(-200),
+      prices: prices.map((item: [number, number]) => item[1]).slice(-clamp),
+      volumes: volumes.length > 0 ? volumes.map((item: [number, number]) => item[1]).slice(-clamp) : [],
+      timestamps: prices.map((item: [number, number]) => item[0]).slice(-clamp),
       // Remove current_price - it should come from price store
       market_cap: marketCaps.length > 0 ? marketCaps[marketCaps.length - 1][1] : 0,
       price_change_24h: calculatePriceChange(prices),

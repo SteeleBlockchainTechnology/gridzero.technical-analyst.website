@@ -259,9 +259,9 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto, predicti
   useEffect(() => {
     // Debounce fetches to avoid racing with price/news/history on first load or crypto switch
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
-    debounceRef.current = window.setTimeout(() => {
+  debounceRef.current = window.setTimeout(() => {
       fetchAnalysis();
-    }, 350) as unknown as number;
+  }, 500) as unknown as number;
     return () => {
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
     };

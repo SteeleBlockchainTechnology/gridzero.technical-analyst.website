@@ -33,6 +33,8 @@ const CACHE_DURATION = {
 
 // Enhanced cache implementation with crypto-specific caching
 const cache = new Map<string, CacheEntry | NewsCacheEntry>();
+// Track in-flight historical requests to de-duplicate concurrent calls
+const inflightHistory = new Map<string, Promise<any>>();
 
 const isValidCache = (key: string, type: keyof typeof CACHE_DURATION) => {
   const cached = cache.get(key);
@@ -54,55 +56,81 @@ export const api = {
     };
   },
 
-  async getHistoricalData(crypto: string, days: number = 200) {
+  async getHistoricalData(crypto: string, days: number = 90) {
     const cacheKey = `historical-${crypto}-${days}`;
     
     if (isValidCache(cacheKey, 'HISTORICAL')) {
       return cache.get(cacheKey)!.data;
     }
 
-    try {
-      const response = await axios.get(`${API_BASE}/crypto/history/${crypto}`, {
-        params: { days: days.toString() },
-        withCredentials: true
-      });
+    // De-duplicate concurrent requests for the same key
+    const existing = inflightHistory.get(cacheKey);
+    if (existing) return existing;
 
-      // The backend already returns processed data in the correct format
-      const transformedData = {
-        prices: response.data.prices || [],
-        volumes: response.data.volumes || [],
-        timestamps: response.data.timestamps || [],
-        // Remove current_price - it should come from price store
-        market_cap: response.data.market_cap || 0,
-        price_change_24h: response.data.price_change_24h || 0,
-        total_volume: response.data.total_volume || 0
-      };
+    const attemptFetch = async () => {
+      const maxAttempts = 3;
+      let attempt = 0;
+      let lastError: any = null;
+      let backoff = 2000; // 2s, 4s, 8s
 
-      cache.set(cacheKey, { data: transformedData, timestamp: Date.now() });
-      return transformedData;
-    } catch (error: any) {
-      console.error('Error fetching historical data:', error);
-      
-      // Handle 429 rate limit errors by returning cached data if available
-      if (error.response?.status === 429) {
-        const cachedData = cache.get(cacheKey);
-        if (cachedData) {
-          console.log(`Rate limit hit, using cached historical data for ${crypto}`);
-          return cachedData.data;
+      while (attempt < maxAttempts) {
+        try {
+          const response = await axios.get(`${API_BASE}/crypto/history/${crypto}`, {
+            params: { days: days.toString() },
+            withCredentials: true
+          });
+
+          const transformedData = {
+            prices: response.data.prices || [],
+            volumes: response.data.volumes || [],
+            timestamps: response.data.timestamps || [],
+            market_cap: response.data.market_cap || 0,
+            price_change_24h: response.data.price_change_24h || 0,
+            total_volume: response.data.total_volume || 0
+          };
+
+          cache.set(cacheKey, { data: transformedData, timestamp: Date.now() });
+          return transformedData;
+        } catch (error: any) {
+          lastError = error;
+          const status = error.response?.status;
+          // On 429, try exponential backoff using server-provided retryAfter if available
+          if (status === 429) {
+            const retryAfter = Number(error.response?.data?.retryAfter) || Math.ceil(backoff / 1000);
+            console.warn(`429 for ${crypto} history. Retrying in ${retryAfter}s (attempt ${attempt + 1}/${maxAttempts})`);
+            await new Promise(r => setTimeout(r, retryAfter * 1000));
+            attempt++;
+            backoff *= 2;
+            continue;
+          }
+
+          // For other errors, break and try cache/fallback below
+          break;
         }
       }
-      
-      // Return fallback data structure if no cache available
+
+      console.error('Error fetching historical data after retries:', lastError?.message || lastError);
+      // Use cache if we have any
+      const cachedData = cache.get(cacheKey);
+      if (cachedData) {
+        console.log(`Using cached historical data for ${crypto} after errors`);
+        return cachedData.data;
+      }
+      // Fallback empty structure
       return {
         prices: [],
         volumes: [],
         timestamps: [],
-        // Remove current_price from fallback data
         market_cap: 0,
         price_change_24h: 0,
         total_volume: 0
       };
-    }
+    };
+
+    const p = attemptFetch().finally(() => inflightHistory.delete(cacheKey));
+    inflightHistory.set(cacheKey, p);
+    return p;
+    
   },
 
   calculate24hChange(prices: [number, number][]): number {
