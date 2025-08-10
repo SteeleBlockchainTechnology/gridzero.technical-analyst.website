@@ -68,6 +68,37 @@ interface ParsedSections {
 }
 
 class AnalysisService {
+  // 15-minute AI cache to throttle Groq calls per crypto
+  private aiCache: Map<string, { timestamp: number; content: string } > = new Map();
+  private readonly AI_MIN_INTERVAL_MS = 15 * 60 * 1000;
+  private readonly MIN_HISTORY_POINTS = 60; // minimum points for stable indicators
+
+  private async waitForPriceReady(crypto: string, maxWaitMs = 1500): Promise<{ price: number; change24h: number; timestamp: number }> {
+    const start = Date.now();
+    // Try immediately first
+    let pd = await priceStore.getPrice(crypto);
+    if (pd.price > 0) return pd;
+    // Retry loop
+    while (Date.now() - start < maxWaitMs) {
+      await new Promise(r => setTimeout(r, 250));
+      pd = await priceStore.getPrice(crypto);
+      if (pd.price > 0) return pd;
+    }
+    return pd; // may be zero; callers handle fallback
+  }
+
+  private async waitForHistoryReady(crypto: string, days: number = 200, maxWaitMs = 3000) {
+    const start = Date.now();
+    let data = await this.getHistoricalData(crypto, days);
+    if (Array.isArray(data?.prices) && data.prices.length >= this.MIN_HISTORY_POINTS) return data;
+    while (Date.now() - start < maxWaitMs) {
+      await new Promise(r => setTimeout(r, 300));
+      data = await this.getHistoricalData(crypto, days);
+      if (Array.isArray(data?.prices) && data.prices.length >= this.MIN_HISTORY_POINTS) return data;
+    }
+    return data;
+  }
+
   private async getHistoricalData(crypto: string, days: number = 200) {
     try {
       console.log(`Fetching historical data for ${crypto}...`);
@@ -288,9 +319,13 @@ class AnalysisService {
   }
 
   private calculateVolumeRatio(volumes: number[], period: number = 20): number {
-    const currentVolume = volumes[volumes.length - 1];
-    const avgVolume = volumes.slice(-period).reduce((a, b) => a + b, 0) / period;
-    return currentVolume / avgVolume;
+  if (!Array.isArray(volumes) || volumes.length === 0) return 1;
+  const window = volumes.slice(-period);
+  const currentVolume = window[window.length - 1] ?? 0;
+  const avgVolume = window.reduce((a, b) => a + b, 0) / Math.max(window.length, 1);
+  if (!Number.isFinite(avgVolume) || avgVolume <= 0) return 1;
+  if (!Number.isFinite(currentVolume)) return 1;
+  return currentVolume / avgVolume;
   }
 
   private determineMarketPhase(prices: number[], ma50: number, ma200: number): string {
@@ -326,6 +361,12 @@ class AnalysisService {
     news: any[],
     sentiment: any
   ): Promise<string> {
+    // Time-based throttle: return cached AI content if within interval
+    const cached = this.aiCache.get(crypto);
+    if (cached && Date.now() - cached.timestamp < this.AI_MIN_INTERVAL_MS) {
+      return cached.content;
+    }
+
     const prompt = `
       Act as an expert quantitative analyst and cryptocurrency trader. Analyze the following comprehensive market data for ${crypto} and provide a detailed strategic analysis:
 
@@ -419,8 +460,10 @@ class AnalysisService {
         temperature: 0.1,
         max_tokens: 2048
       });
-
-      return completion.choices[0]?.message?.content ?? "";
+  const content = completion.choices[0]?.message?.content ?? "";
+  // Store in cache on success
+  this.aiCache.set(crypto, { timestamp: Date.now(), content });
+  return content;
     } catch (error) {
       console.error('Error calling Groq API:', error);
       return "Unable to generate AI analysis at this time. Please try again later.";
@@ -498,32 +541,43 @@ class AnalysisService {
 
   async getDetailedAnalysis(crypto: string): Promise<DetailedAnalysis> {
     try {
-      // Get current price from centralized price store
-      const priceData = await priceStore.getPrice(crypto);
+      // Ensure price store is active for this crypto
+      try { await priceStore.setActiveCrypto(crypto); } catch {}
+
+      // Get current price from centralized price store (with small wait for readiness)
+      const priceData = await this.waitForPriceReady(crypto);
       const currentPrice = priceData.price;
-      
-      const historicalData = await this.getHistoricalData(crypto);
+
+      // Fetch historical data with readiness check
+      const historicalData = await this.waitForHistoryReady(crypto);
       const prices = historicalData.prices;
       const volumes = historicalData.volumes;
       // Use currentPrice from price store instead of historicalData.current_price
 
+      // Validate and early-guard to avoid NaNs
+      if (!Array.isArray(prices) || prices.length < this.MIN_HISTORY_POINTS) {
+        throw new Error('Insufficient historical data');
+      }
+      const safePrices = prices.filter(p => Number.isFinite(p) && p > 0);
+      const safeVolumes = Array.isArray(volumes) ? volumes.filter(v => Number.isFinite(v) && v >= 0) : [];
+
       // Calculate all technical indicators
-      const rsi = this.calculateRSI(prices);
-      const macd = this.calculateMACD(prices);
+      const rsi = this.calculateRSI(safePrices);
+      const macd = this.calculateMACD(safePrices);
       
       // Calculate moving averages
       const movingAverages = {
-        ma20: this.calculateSMA(prices, 20),
-        ma50: this.calculateSMA(prices, 50),
-        ma200: this.calculateSMA(prices, 200)
+        ma20: this.calculateSMA(safePrices, 20),
+        ma50: this.calculateSMA(safePrices, 50),
+        ma200: this.calculateSMA(safePrices, 200)
       };
 
-      const { support, resistance } = this.findSupportResistance(prices);
-      const volumeRatio = this.calculateVolumeRatio(volumes);
-      const volatilityIndex = this.calculateVolatility(prices);
-      const stochRSI = this.calculateStochRSI(prices);
-      const obvTrend = this.calculateOBV(prices, volumes);
-      const marketPhase = this.determineMarketPhase(prices, movingAverages.ma50, movingAverages.ma200);
+      const { support, resistance } = this.findSupportResistance(safePrices);
+      const volumeRatio = this.calculateVolumeRatio(safeVolumes.length ? safeVolumes : new Array(safePrices.length).fill(0));
+      const volatilityIndex = this.calculateVolatility(safePrices);
+      const stochRSI = this.calculateStochRSI(safePrices);
+      const obvTrend = this.calculateOBV(safePrices, safeVolumes.length ? safeVolumes : new Array(safePrices.length).fill(0));
+      const marketPhase = this.determineMarketPhase(safePrices, movingAverages.ma50, movingAverages.ma200);
 
       // Create technical indicators object with calculated MAs
       const technicalIndicators: TechnicalIndicators = {
@@ -547,14 +601,14 @@ class AnalysisService {
       };
 
       // Updated market summary with date-based formatting and current trend lines
-      const latestDateIndex = prices.length - 1;
-      const latestPrice = prices[latestDateIndex] || 0;
+  const latestDateIndex = safePrices.length - 1;
+  const latestPrice = safePrices[latestDateIndex] || currentPrice || 0;
       const marketSummary = `${crypto.charAt(0).toUpperCase() + crypto.slice(1)} as of ${new Date().toLocaleDateString()} is in a ${marketPhase} phase, trading at $${latestPrice.toFixed(2)}. RSI is ${(rsi || 0).toFixed(2)} (${this.interpretRSI(rsi || 0)}), with MACD indicating ${macd.interpretation}. The volume trend is ${obvTrend} with a ${(volumeRatio || 0).toFixed(2)}x change compared to the average volume.`;
 
       // Get market sentiment and news
       const sentiment = await this.getMarketSentiment(crypto);
-      const newsResponse = await api.getNews(crypto);
-      const newsItems = newsResponse.news; // Extract the news array
+  const newsResponse = await api.getNews(crypto);
+  const newsItems = newsResponse.news; // Extract the news array
 
       // Generate signals based on all indicators
       const signals = [
@@ -602,7 +656,7 @@ class AnalysisService {
       const parsedAnalysis = this.parseAIAnalysis(aiAnalysis);
 
       // Calculate confidence for each timeframe
-      const shortTermConfidence = this.calculateConfidence(rsi, macd, volumeRatio, sentiment, volatilityIndex);
+  const shortTermConfidence = this.calculateConfidence(rsi, macd, volumeRatio, sentiment, volatilityIndex);
       const midTermConfidence = Math.max(30, shortTermConfidence * 0.9); // Slightly lower confidence for mid-term
       const longTermConfidence = Math.max(30, shortTermConfidence * 0.8); // Even lower for long-term
       const volatility = this.calculateVolatility(prices);

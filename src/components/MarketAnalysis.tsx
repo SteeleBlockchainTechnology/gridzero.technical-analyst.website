@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Brain, TrendingUp, TrendingDown, Activity, Target, AlertTriangle, Clock, BarChart, LineChart, PieChart } from 'lucide-react';
 import { analysisService } from '../services/analysis';
 import { motion } from 'framer-motion';
@@ -168,10 +168,15 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto, predicti
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPrice, setCurrentPrice] = useState<PriceData | null>(null);
+  const debounceRef = useRef<number | null>(null);
+  const reqCounter = useRef(0);
 
   // Subscribe to price store updates
   useEffect(() => {
     if (!crypto) return;
+
+    // Ensure price store is actively fetching the selected asset
+    priceStore.setActiveCrypto(crypto).catch(() => {});
 
     const unsubscribe = priceStore.subscribe('market-analysis', (cryptoId, priceData) => {
       if (cryptoId === crypto) {
@@ -182,10 +187,25 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto, predicti
     return unsubscribe;
   }, [crypto]);
 
+  const waitForReadiness = async () => {
+    // Wait for current price > 0 (max ~1.5s)
+    const start = Date.now();
+    while (Date.now() - start < 1500) {
+      const pd = await priceStore.getPrice(crypto);
+      if (pd.price > 0) break;
+      await new Promise(r => setTimeout(r, 200));
+    }
+    // Optionally, give historical endpoint a brief head start too
+    await new Promise(r => setTimeout(r, 200));
+  };
+
   const fetchAnalysis = async () => {
+    const thisReq = ++reqCounter.current;
     try {
       setLoading(true);
       setError(null);
+
+      await waitForReadiness();
       
       const result = await analysisService.getDetailedAnalysis(crypto);
       if (!result) {
@@ -201,11 +221,14 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto, predicti
         }
       };
 
-      setAnalysis(mergedAnalysis);
+      if (thisReq === reqCounter.current) {
+        setAnalysis(mergedAnalysis);
+      }
     } catch (err) {
       console.error('Error in MarketAnalysis:', err);
-      setError('Failed to fetch market analysis');
-      setAnalysis({
+      if (thisReq === reqCounter.current) {
+        setError('Failed to fetch market analysis');
+        setAnalysis({
         summary: 'Market analysis unavailable',
         aiAnalysis: 'AI analysis unavailable',
         priceTargets: {
@@ -224,15 +247,25 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto, predicti
         marketStructure: {
           trend: 'Neutral'
         }
-      });
+        });
+      }
     } finally {
-      setLoading(false);
+      if (thisReq === reqCounter.current) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    fetchAnalysis();
-  }, [crypto, predictions, currentPrice]); // Include currentPrice as dependency
+    // Debounce fetches to avoid racing with price/news/history on first load or crypto switch
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(() => {
+      fetchAnalysis();
+    }, 350) as unknown as number;
+    return () => {
+      if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    };
+  }, [crypto, predictions, currentPrice]);
 
   if (loading) {
     const loadingSteps = [

@@ -44,7 +44,7 @@ This project aligns with Grid Zero’s mission to empower traders through AI edu
 
 ## Architecture (high level)
 
-- React/Vite app calls backend via relative routes (/api/*); Vite proxies to the backend in dev
+- React/Vite app calls backend via relative routes (/api/\*); Vite proxies to the backend in dev
 - WebSocket server is mounted on the same HTTP server instance; dev clients connect via /ws (proxied)
 - Backend layers:
   - OAuth and role verification (Discord): ensures “Premium Access” role in configured guild
@@ -84,6 +84,7 @@ Create .env from .env.example and fill in values.
   - VITE_COINGECKO_API_KEY=... (optional; CoinGecko public endpoints used)
 
 Notes:
+
 - For production, set NODE_ENV=production, HOST=ta.gridzero.xyz, and DISCORD_CALLBACK_URL=https://ta.gridzero.xyz/api/auth/discord/callback.
 - You can also use PORT or VITE_PORT to override backend port; the server reads BACKEND_PORT | PORT | VITE_PORT.
 - .gitignore excludes .env files by default. Never commit secrets.
@@ -102,7 +103,7 @@ Notes:
 
 ## Local Development
 
-1) Install prerequisites
+1. Install prerequisites
 
 ```bash
 npm install
@@ -110,18 +111,19 @@ cp .env.example .env
 # Fill in Discord keys and API keys in .env
 ```
 
-2) Start the full stack (dev):
+2. Start the full stack (dev):
 
 ```bash
 npm run start
 ```
 
-3) Access the app
+3. Access the app
 
 - Frontend: http://localhost:3000
 - Backend: http://localhost:5000
 
 Auth flow notes (dev):
+
 - Clicking “Verify with Discord” redirects to Discord OAuth.
 - On success, you must belong to the configured guild and hold the Premium role.
 - The server uses sessions + cookies; ensure you access via localhost (not 127.0.0.1 or a different host) for consistency.
@@ -132,7 +134,7 @@ See PRODUCTION_DEPLOYMENT.md for full details (systemd + Nginx).
 
 Quick overview:
 
-1) Build and start
+1. Build and start
 
 ```bash
 npm ci --omit=dev
@@ -141,7 +143,7 @@ npm run server:build
 npm run server:start
 ```
 
-2) systemd service (example)
+2. systemd service (example)
 
 ```ini
 [Unit]
@@ -164,7 +166,7 @@ StandardError=append:/opt/gridzero/logs/technical-analyst-website-error.log
 WantedBy=multi-user.target
 ```
 
-3) Nginx (TLS + proxy + WebSockets)
+3. Nginx (TLS + proxy + WebSockets)
 
 ```nginx
 server {
@@ -204,6 +206,7 @@ server {
 ```
 
 Environment (prod):
+
 - NODE_ENV=production
 - HOST=ta.gridzero.xyz
 - DISCORD_CALLBACK_URL=https://ta.gridzero.xyz/api/auth/discord/callback
@@ -220,23 +223,28 @@ Environment (prod):
 ## Troubleshooting
 
 Auth loops / verification fails:
+
 - Ensure the Discord application Redirect URI matches your DISCORD_CALLBACK_URL exactly.
 - Confirm the bot is in the guild and has permissions; DISCORD_GUILD_ID and DISCORD_PREMIUM_ROLE_ID must be correct.
 - In production, cookies require https and sameSite=none; ensure you serve via TLS and set HOST properly.
 - Check Nginx forwarding headers (Host, X-Forwarded-Proto) and that your session secret is set.
 
 WebSocket not connecting:
+
 - Confirm Nginx includes Upgrade/Connection headers.
 - Backend must use server.listen (already wired) so upgrade requests are handled.
 - In dev, client connects to /ws through Vite proxy; verify FRONTEND_PORT/BACKEND_PORT.
 
 Port conflicts:
+
 - Adjust BACKEND_PORT/FRONTEND_PORT or stop processes using the ports.
 
 Rate limiting (429s):
+
 - CoinGecko/NewsData requests are rate‑limited; backend caches results and falls back to cache when available.
 
 TradingView/widget warnings:
+
 - Third‑party scripts may log benign warnings; ensure network access is allowed and CSP permits required domains.
 
 ## Contributing

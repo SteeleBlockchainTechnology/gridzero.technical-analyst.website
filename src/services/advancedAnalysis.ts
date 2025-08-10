@@ -482,13 +482,14 @@ class AdvancedAnalysisService {
   private async calculateTechnicalSignals(priceData: any, volumeData: any): Promise<TechnicalSignals> {
     try {
       // Additional validation
-      if (!Array.isArray(priceData.prices) || priceData.prices.length < 200) {
+  if (!Array.isArray(priceData.prices) || priceData.prices.length < 60) {
         console.error('Invalid price data:', priceData);
         throw new Error('Insufficient price data');
       }
 
-      const prices = priceData.prices;
-      const volumes = Array.isArray(volumeData) ? volumeData : [];
+  const prices = priceData.prices.filter((p: number) => Number.isFinite(p) && p > 0);
+  const volumesRaw = Array.isArray(volumeData) ? volumeData : [];
+  const volumes = volumesRaw.length === prices.length ? volumesRaw : new Array(prices.length).fill(0);
 
       // Calculate moving averages first
       const smaResults = {
@@ -498,20 +499,20 @@ class AdvancedAnalysisService {
       };
 
       // Calculate indicators using full dataset
-      const rsi = this.calculateRSI(prices, 14);
+  const rsi = this.calculateRSI(prices, 14);
       const macd = {
         value: this.calculateMACD(prices),
         signal: this.calculateMACDSignal(prices),
         histogram: this.calculateMACDHistogram(prices)
       };
-      const stochRSI = this.calculateStochRSI(prices, 14);
+  const stochRSI = this.calculateStochRSI(prices, 14);
       
       // Calculate volume metrics using more data
       const volumeChange = volumes.length > 0 ? 
         this.calculateVolumeRatio(volumes.slice(-100)) : 1;
       
       // Calculate volatility using more data
-      const volatility = this.calculateVolatility(prices.slice(-100));
+  const volatility = this.calculateVolatility(prices.slice(-100));
 
       // Calculate trends using full dataset and moving averages
       const primaryTrend = this.determineTrendDirection(prices, smaResults);
@@ -520,7 +521,7 @@ class AdvancedAnalysisService {
         prices.slice(-200),
         volumes.slice(-200)
       );
-      const trendStrength = volumeProfile.strength || 0.5;
+  const trendStrength = Number.isFinite(volumeProfile.strength) ? volumeProfile.strength : 0.5;
 
       console.log('Technical Calculations:', {
         dataPointsUsed: prices.length,
@@ -542,25 +543,29 @@ class AdvancedAnalysisService {
         },
         momentum: {
           rsi: {
-            value: Number(rsi.toFixed(2)),
-            signal: this.interpretRSI(rsi)
+            value: Number((Number.isFinite(rsi) ? rsi : 50).toFixed(2)),
+            signal: this.interpretRSI(Number.isFinite(rsi) ? rsi : 50)
           },
           macd: {
-            value: Number(macd.value.toFixed(2)),
-            signal: this.interpretMACD(macd.value, macd.signal, macd.histogram)
+            value: Number((Number.isFinite(macd.value) ? macd.value : 0).toFixed(2)),
+            signal: this.interpretMACD(
+              Number.isFinite(macd.value) ? macd.value : 0,
+              Number.isFinite(macd.signal) ? macd.signal : 0,
+              Number.isFinite(macd.histogram) ? macd.histogram : 0
+            )
           },
           stochRSI: {
-            value: Number(stochRSI.toFixed(2)),
-            signal: this.interpretStochRSI(stochRSI)
+            value: Number((Number.isFinite(stochRSI) ? stochRSI : 50).toFixed(2)),
+            signal: this.interpretStochRSI(Number.isFinite(stochRSI) ? stochRSI : 50)
           }
         },
         volatility: {
-          current: Number(volatility.toFixed(2)),
+          current: Number((Number.isFinite(volatility) ? volatility : 30).toFixed(2)),
           trend: this.determineVolatilityTrend(prices.slice(-100)),
           risk: this.categorizeVolatilityRisk(volatility)
         },
         volume: {
-          change: Number(volumeChange.toFixed(2)),
+          change: Number((Number.isFinite(volumeChange) ? volumeChange : 1).toFixed(2)),
           trend: this.determineVolumeTrend(volumes.slice(-100)),
           significance: volumeProfile.strength > 0.7 ? 'strong' :
                        volumeProfile.strength > 0.4 ? 'moderate' : 'weak'
@@ -994,32 +999,78 @@ class AdvancedAnalysisService {
 
   async getFullAnalysis(crypto: string): Promise<AdvancedAnalysis> {
     try {
-      // Get current price from centralized price store  
-      const priceData = await priceStore.getPrice(crypto);
+  // Normalize crypto id for APIs
+  const id = (crypto || '').trim().toLowerCase();
+
+  // Get current price from centralized price store
+  let priceData = await priceStore.getPrice(id);
+      // Preflight: if price is 0 on first switch, wait briefly for readiness to reduce retries later
+      if (!priceData.price || priceData.price <= 0) {
+        const startWait = Date.now();
+        while (Date.now() - startWait < 1200) {
+          await new Promise(r => setTimeout(r, 200));
+          priceData = await priceStore.getPrice(id);
+          if (priceData.price && priceData.price > 0) break;
+        }
+      }
       
-      // Fetch historical data
-      const historicalData = await api.getHistoricalData(crypto);
+      // Fetch historical data with a short readiness retry if needed
+  let historicalData = await api.getHistoricalData(id);
+      if (!historicalData?.prices?.length || historicalData.prices.length < 60) {
+        for (let i = 0; i < 4; i++) {
+          await new Promise(r => setTimeout(r, 250));
+          historicalData = await api.getHistoricalData(id);
+          if (historicalData?.prices?.length && historicalData.prices.length >= 60) break;
+        }
+      }
       console.log('Raw Historical Data:', historicalData);
 
       // Validate the data
-      if (!historicalData?.prices?.length || historicalData.prices.length < 20) {
+  if (!historicalData?.prices?.length || historicalData.prices.length < 60) {
         console.error('Invalid or insufficient historical data:', historicalData);
         return this.getDefaultAnalysis(crypto);
       }
 
       // Process the data - use price from price store
       const processedData = {
-        prices: historicalData.prices,
-        volumes: historicalData.volumes || Array(historicalData.prices.length).fill(0),
-        current_price: priceData.price, // Use price from centralized store
+        prices: historicalData.prices.filter((p: number) => Number.isFinite(p) && p > 0),
+        volumes: (historicalData.volumes && historicalData.volumes.length === historicalData.prices.length)
+          ? historicalData.volumes
+          : Array(historicalData.prices.length).fill(0),
+        current_price: priceData.price, // initial current price from store
         market_cap: historicalData.market_cap || 0,
         price_change_24h: priceData.change24h // Use change24h from centralized store
       };
 
-      // Validate processed data
+      // If current price isn't ready yet (common right after switching assets),
+      // try to recover using historical last price or a short retry from the store
+  if (!processedData.current_price || processedData.current_price <= 0) {
+        const lastHistPrice = processedData.prices[processedData.prices.length - 1];
+        if (lastHistPrice && lastHistPrice > 0) {
+          console.warn(`[advancedAnalysis] Using last historical price for ${id} as fallback:`, lastHistPrice);
+          processedData.current_price = lastHistPrice;
+        } else {
+          console.warn(`[advancedAnalysis] Current price not ready for ${id}. Retrying price store briefly...`);
+          for (let attempt = 1; attempt <= 2; attempt++) {
+            // wait 400ms then retry getting price from store
+            await new Promise(r => setTimeout(r, 400));
+            priceData = await priceStore.getPrice(id);
+            if (priceData.price && priceData.price > 0) {
+              processedData.current_price = priceData.price;
+              console.warn(`[advancedAnalysis] Recovered current price for ${id} on attempt ${attempt}:`, priceData.price);
+              break;
+            }
+          }
+        }
+      }
+
+      // Final validation of processed data
       if (processedData.current_price <= 0 || processedData.prices.length === 0) {
-        console.error('Invalid processed data:', processedData);
-        return this.getDefaultAnalysis(crypto);
+        console.error('[advancedAnalysis] Invalid processed data after fallbacks:', {
+          hasPrices: processedData.prices.length,
+          currentPrice: processedData.current_price
+        });
+        return this.getDefaultAnalysis(id);
       }
 
       console.log('Processed Data:', {
@@ -1044,12 +1095,12 @@ class AdvancedAnalysisService {
       const marketCondition = await this.calculateMarketPhase(
         processedData.prices,
         processedData.volumes,
-        crypto
+        id
       );
 
       // Get sentiment and news data
-      const sentiment = await api.getSentiment(crypto);
-      const newsData = await api.getNews(crypto);
+  const sentiment = await api.getSentiment(id);
+  const newsData = await api.getNews(id);
 
       // Calculate predictions with processed data
       const predictions = await this.predictPriceTargets({
@@ -1057,7 +1108,7 @@ class AdvancedAnalysisService {
         volumes: processedData.volumes,
         currentPrice: processedData.current_price,
         volatility: technicalSignals.volatility.current,
-        sentiment: sentiment?.[0]?.volume || 50
+        sentiment: Number.isFinite(sentiment?.[0]?.volume) ? sentiment[0].volume : 50
       });
 
       // Calculate risk analysis with processed data
@@ -1094,8 +1145,8 @@ class AdvancedAnalysisService {
         })
       };
     } catch (error) {
-      console.error('Error in advanced analysis:', error);
-      return this.getDefaultAnalysis(crypto);
+  console.error('Error in advanced analysis:', error);
+  return this.getDefaultAnalysis((crypto || '').trim().toLowerCase());
     }
   }
 

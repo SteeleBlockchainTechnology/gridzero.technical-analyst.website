@@ -85,6 +85,15 @@ const server = http.createServer(app);
 // Prefer BACKEND_PORT/PORT for dev; keep VITE_PORT fallback to preserve existing behavior
 const PORT = parseInt(process.env.BACKEND_PORT || process.env.PORT || process.env.VITE_PORT || '5000', 10);
 
+// Resolve frontend origin for redirects (OAuth success/failure) and dev convenience
+const HOST = process.env.HOST || 'localhost';
+const FRONTEND_PORT = process.env.FRONTEND_PORT || process.env.VITE_FRONTEND_PORT || '3000';
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || (
+  process.env.NODE_ENV === 'production'
+    ? `https://${HOST}`
+    : `http://localhost:${FRONTEND_PORT}`
+);
+
 // Trust proxy for Nginx/reverse proxy setup
 app.set('trust proxy', 1);
 
@@ -163,7 +172,7 @@ app.get('/api/auth/discord/callback', (req, res, next) => {
   console.log('Session data before auth:', req.session);
   next();
 }, passport.authenticate('discord', {
-  failureRedirect: '/verification-failed'
+  failureRedirect: `${FRONTEND_ORIGIN}/verification-failed`
 }), (req, res) => {
   // Custom success handler to ensure session is saved before redirect
   console.log('=== AUTHENTICATION SUCCESS ===');
@@ -196,11 +205,8 @@ app.get('/api/auth/discord/callback', (req, res, next) => {
         }
         
         console.log('Session saved successfully, redirecting...');
-        const redirectUrl = process.env.NODE_ENV === 'production' 
-          ? `https://${process.env.HOST}`
-          : 'http://localhost:5000';
-        
-        res.redirect(redirectUrl);
+  // Always redirect to the frontend origin so the SPA handles routing
+  res.redirect(FRONTEND_ORIGIN + '/');
       });
     });
   });
@@ -238,9 +244,15 @@ app.get('/api/verification-failed', (req, res) => {
 app.get('/api/auth/reset', (_req, res) => {
   _req.logout((err: any) => {
     if (err) return res.status(500).json({ error: 'Reset failed.' });
-    res.redirect('/');
+    // Send user back to the frontend app root
+    res.redirect(FRONTEND_ORIGIN + '/');
   });
 });
+
+// In development, if someone hits the backend root, send them to the Vite frontend
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/', (_req, res) => res.redirect(FRONTEND_ORIGIN));
+}
 
 // Session test endpoint for debugging
 app.get('/api/session-test', (req, res) => {
