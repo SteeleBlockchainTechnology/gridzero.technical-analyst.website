@@ -1,285 +1,260 @@
-# Agent Zero TA
+<div align="center">
 
-A complete real-time cryptocurrency analysis platform that combines technical analysis, sentiment analysis, trading volume data, news trends, and AI-powered predictions to provide comprehensive market insights and trading recommendations.
+# Grid Zero Technical Analyst (TA) Website
 
-(Note: You may hit the rate limit, as this is using Coingeko free API.)
+Real-time crypto analysis for the Grid Zero community — technical indicators, AI/ML insights, risk, and premium Discord role gating.
 
-## Table of Contents
+<br />
 
-1. [Overview](#overview)
-2. [Features](#features)
-3. [Technical Architecture](#technical-architecture)
-4. [Core Components](#core-components)
-5. [Analysis Modules](#analysis-modules)
-6. [AI Integration](#ai-integration)
-7. [Setup Instructions](#setup-instructions)
-8. [API Documentation](#api-documentation)
-9. [Contributing](#contributing)
-10. [License](#license)
+![React](https://img.shields.io/badge/Frontend-React%2018%20%2B%20Vite-61DAFB?logo=react&logoColor=061b2c)
+![TypeScript](https://img.shields.io/badge/Language-TypeScript-3178C6?logo=typescript&logoColor=white)
+![Tailwind](https://img.shields.io/badge/UI-TailwindCSS-38B2AC?logo=tailwindcss&logoColor=white)
+![shadcn/ui](https://img.shields.io/badge/Components-shadcn%2Fui-000000)
+![Framer Motion](https://img.shields.io/badge/Animations-Framer%20Motion-FF008A)
+![Express](https://img.shields.io/badge/Backend-Express.js-000000?logo=express)
+![WebSockets](https://img.shields.io/badge/Realtime-WebSockets-3EAAAF?logo=socket.io&logoColor=white)
+![TensorFlow.js](https://img.shields.io/badge/AI-TensorFlow.js-FF6F00?logo=tensorflow&logoColor=white)
 
-## Overview
+</div>
 
-A Next.js-based cryptocurrency analysis platform that provides real-time market insights, technical analysis, and AI-powered trading recommendations. The platform combines multiple data sources and advanced algorithms to deliver comprehensive market analysis.
+## Project Overview
 
-### Core Features
+Grid Zero TA is a full‑stack web application that provides real‑time cryptocurrency analysis. It combines on‑chart technical indicators (RSI, MACD, MAs), news sentiment, risk assessment, and AI/ML‑driven predictions to help traders make better decisions. Premium access is gated via Discord OAuth with server role verification for Grid Zero’s “Premium Access” role.
 
-- Real-time price tracking and analysis
-- Multiple timeframe support (1H, 4H, 1D, 1W, 1M)
-- Advanced technical analysis with multiple indicators
-- AI-powered price predictions
-- Sentiment analysis from news and social media
-- Risk assessment and management
-- Automated trading strategy generation
-- Real-time WebSocket data streaming
-- Responsive and interactive UI with Framer Motion animations
+This project aligns with Grid Zero’s mission to empower traders through AI education, hands‑on analytics, and custom programming tools.
 
-## Technical Architecture
+## Features
 
-### Frontend Stack
+- Real‑time prices and updates via WebSockets (wss) with graceful fallbacks
+- Technical analysis: RSI, MACD, MAs (20/50/200), StochRSI, volatility, OBV, support/resistance, market phase
+- Advanced analysis engine that fuses technicals, sentiment, risk, and ML predictions into strategies
+- News aggregation and sentiment classification (NewsData API)
+- AI‑generated analysis (Groq LLM) and TensorFlow.js models (trend/price/levels)
+- Premium verification via Discord OAuth (passport‑discord) with guild role check
+- Responsive UI with TailwindCSS, shadcn/ui, Radix primitives, and Framer Motion
+- Caching and rate limiting to respect CoinGecko and NewsData free tiers
 
-- Next.js 14
-- TypeScript
-- TailwindCSS
-- Framer Motion
-- Shadcn/ui Components
-- TensorFlow.js
+## Tech Stack
 
-### Backend Services
+- Frontend: React 18 + Vite + TypeScript, TailwindCSS, shadcn/ui, Radix UI, Framer Motion, lightweight‑charts
+- Backend: Express.js, passport‑discord (OAuth), express‑session, ws (WebSocket server)
+- AI/ML: TensorFlow.js (tfjs), custom models (trend/price/levels), Groq SDK for LLM analysis
+- Data: CoinGecko (prices/history), NewsData.io (news)
+- Dev tooling: tsx, concurrently, ESLint, TypeScript project refs, Vite proxy
 
-- Express.js server
-- WebSocket server for real-time data
-- TensorFlow.js for ML models
-- News API integration
-- CoinGecko API integration
+## Architecture (high level)
 
-### Data Flow
+- React/Vite app calls backend via relative routes (/api/*); Vite proxies to the backend in dev
+- WebSocket server is mounted on the same HTTP server instance; dev clients connect via /ws (proxied)
+- Backend layers:
+  - OAuth and role verification (Discord): ensures “Premium Access” role in configured guild
+  - REST endpoints: /api/crypto/price, /api/crypto/history, /api/news, and auth/session checks
+  - Caching + rate limiting for CoinGecko and NewsData (in‑memory)
+  - Analysis services: technical indicators, sentiment synthesis, ML predictions, risk, strategy
 
-1. Real-time price data via WebSocket
-2. Historical data from CoinGecko API
-3. News data from NewsData API
-4. Sentiment analysis processing
-5. ML model predictions
-6. Strategy generation
-7. UI updates and animations
+## Project Structure (selected)
 
-## Core Components
-
-### Market Analysis (`src/components/MarketAnalysis.tsx`)
-
-- Real-time market analysis dashboard
-- Technical indicator visualization
-- Price action analysis
-- Volume profile analysis
-- Market structure detection
-
-### Advanced Analysis (`src/components/AdvancedAnalysis.tsx`)
-
-- Comprehensive market analysis
-- Multiple analysis modules integration
-- Real-time data processing
-- Interactive visualization components
-
-### News Panel (`src/components/NewsPanel.tsx`)
-
-- Real-time news aggregation
-- Sentiment analysis integration
-- Source credibility scoring
-- Interactive news cards with metadata
-
-## Analysis Modules
-
-### Technical Analysis
-
-#### Technical indicators implemented:
-
-- RSI (Relative Strength Index)
-- MACD (Moving Average Convergence Divergence)
-  Moving Averages (20, 50, 200)
-  Bollinger Bands
-  Volume Profile
-  Support/Resistance Levels
-
-### Market Phase Detection
-
-#### Market phases identified:
-
-- Accumulation
-- Mark Up
-  Distribution
-  Mark Down
-  Ranges and Transitions
-
-### Risk Analysis
-
-```typescript
-// Risk factors considered:
-- Volatility Risk
-- Trend Risk
-- Volume Risk
-- News Risk
-- Social Sentiment Risk
-- Market Structure Risk
+```
+src/
+  components/            # UI + analysis views (MarketAnalysis, AdvancedAnalysis, NewsPanel, etc.)
+  services/              # api, priceStore, websocket, analysis engines, ML models, risk, strategy
+  server/                # Express server, passport config, routes, WebSocket wiring
 ```
 
-### Trading Strategy Generation
+## Environment Variables
 
-```typescript
-// Strategy components:
-- Entry Points (Conservative, Moderate, Aggressive)
-- Stop Loss Levels (Tight, Normal, Wide)
-- Take Profit Targets
-- Position Sizing Recommendations
-- Timeframe Selection
-```
+Create .env from .env.example and fill in values.
 
-## AI Integration
+- Core (dev defaults)
+  - FRONTEND_PORT=3000
+  - BACKEND_PORT=5000
+  - HOST=localhost
+  - NODE_ENV=development
+  - SESSION_SECRET=your_random_string
+  - DISCORD_CALLBACK_URL=http://localhost:5000/api/auth/discord/callback
+- Discord (required)
+  - DISCORD_CLIENT_ID=...
+  - DISCORD_CLIENT_SECRET=...
+  - DISCORD_BOT_TOKEN=...
+  - DISCORD_GUILD_ID=...
+  - DISCORD_PREMIUM_ROLE_ID=...
+- Data/APIs
+  - VITE_NEWSDATA_API_KEY=...
+  - VITE_GROQ_API_KEY=...
+  - VITE_COINGECKO_API_KEY=... (optional; CoinGecko public endpoints used)
 
-### Machine Learning Models (`src/services/ml/models.ts`)
+Notes:
+- For production, set NODE_ENV=production, HOST=ta.gridzero.xyz, and DISCORD_CALLBACK_URL=https://ta.gridzero.xyz/api/auth/discord/callback.
+- You can also use PORT or VITE_PORT to override backend port; the server reads BACKEND_PORT | PORT | VITE_PORT.
+- .gitignore excludes .env files by default. Never commit secrets.
 
-- TrendModel: Predicts market trend direction
-- PriceModel: Generates price predictions
-- LevelModel: Identifies key price levels
+## Scripts
 
-### Model Architecture
+- npm run start — starts both frontend and backend in dev mode
+  - Frontend: http://localhost:3000 (Vite)
+  - Backend: http://localhost:5000 (Express)
+- npm run dev — Vite dev server only (honors FRONTEND_PORT/BACKEND_PORT for proxy)
+- npm run server:dev — Backend only with tsx watch
+- npm run build — Type check and build frontend (Vite)
+- npm run server:build — Compile backend to dist/server
+- npm run server:start — Run compiled backend
+- npm run start:prod — Build frontend + backend, then run compiled backend (production)
 
-```typescript
-// Sequential model structure:
-model.add(
-  tf.layers.dense({
-    units: 32,
-    activation: "relu",
-    inputShape: [4],
-  })
-);
-model.add(tf.layers.dropout({ rate: 0.2 }));
-model.add(
-  tf.layers.dense({
-    units: 16,
-    activation: "relu",
-  })
-);
-```
+## Local Development
 
-## Setup Instructions
-
-### Prerequisites
-
-- Node.js 18+
-- npm or yarn
-- MongoDB (optional)
-
-### Installation
+1) Install prerequisites
 
 ```bash
-# Clone the repository
-git clone [repository-url]
-
-# Install dependencies
 npm install
-
-# Set up environment variables
 cp .env.example .env
-# Edit .env with your API keys
+# Fill in Discord keys and API keys in .env
+```
 
-# Start development server
-npm run dev
+2) Start the full stack (dev):
 
-# Build for production
+```bash
+npm run start
+```
+
+3) Access the app
+
+- Frontend: http://localhost:3000
+- Backend: http://localhost:5000
+
+Auth flow notes (dev):
+- Clicking “Verify with Discord” redirects to Discord OAuth.
+- On success, you must belong to the configured guild and hold the Premium role.
+- The server uses sessions + cookies; ensure you access via localhost (not 127.0.0.1 or a different host) for consistency.
+
+## Production Deployment
+
+See PRODUCTION_DEPLOYMENT.md for full details (systemd + Nginx).
+
+Quick overview:
+
+1) Build and start
+
+```bash
+npm ci --omit=dev
 npm run build
-npm start
+npm run server:build
+npm run server:start
 ```
 
-### Environment Variables
+2) systemd service (example)
 
-```env
-VITE_PORT=3001
-VITE_NEWSDATA_API_KEY=your_api_key
-VITE_GROQ_API_KEY=your_groq_api_key
+```ini
+[Unit]
+Description=Grid Zero Technical Analyst Website
+After=network.target
+
+[Service]
+Type=simple
+User=gridzero
+WorkingDirectory=/opt/gridzero/websites/technical-analyst
+Environment=NODE_ENV=production
+Environment=HOST=ta.gridzero.xyz
+ExecStart=/usr/bin/npm run start:prod
+Restart=always
+RestartSec=10
+StandardOutput=append:/opt/gridzero/logs/technical-analyst-website.log
+StandardError=append:/opt/gridzero/logs/technical-analyst-website-error.log
+
+[Install]
+WantedBy=multi-user.target
 ```
 
-## API Documentation
+3) Nginx (TLS + proxy + WebSockets)
 
-### WebSocket API
+```nginx
+server {
+  listen 443 ssl http2;
+  server_name ta.gridzero.xyz;
 
-```typescript
-// Connect to WebSocket
-const ws = new WebSocket(`ws://crypto-sensei.vercel.app:3001`);
+  # SSL managed by Certbot
+  ssl_certificate /etc/letsencrypt/live/ta.gridzero.xyz/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/ta.gridzero.xyz/privkey.pem;
+  include /etc/letsencrypt/options-ssl-nginx.conf;
+  ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 
-// Subscribe to crypto updates
-ws.send(
-  JSON.stringify({
-    type: "subscribe",
-    crypto: "bitcoin",
-  })
-);
+  # Security headers
+  add_header X-Content-Type-Options nosniff;
+  add_header X-Frame-Options DENY;
+  add_header X-XSS-Protection "1; mode=block";
+  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+  location / {
+    proxy_pass http://localhost:5000; # or 3001 if you prefer
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection 'upgrade';
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 86400;
+  }
+}
+
+server {
+  listen 80;
+  server_name ta.gridzero.xyz;
+  return 301 https://$server_name$request_uri;
+}
 ```
 
-### REST API Endpoints
+Environment (prod):
+- NODE_ENV=production
+- HOST=ta.gridzero.xyz
+- DISCORD_CALLBACK_URL=https://ta.gridzero.xyz/api/auth/discord/callback
+- BACKEND_PORT/PORT per your server (e.g., 5000 or 3001)
 
-```typescript
-// Price data
-GET /api/crypto/price/:id
+## Endpoints (selected)
 
-// Historical data
-GET /api/crypto/history/:id
+- Auth: /api/auth/discord, /api/auth/discord/callback, /api/check-verification, /api/auth/reset
+- Prices: /api/crypto/price/:id, /api/crypto/prices
+- History: /api/crypto/history/:id
+- News: /api/news/:crypto
+- WebSocket: /ws (subscribe with { type: 'subscribe', crypto: 'bitcoin' })
 
-// News data
-GET /api/news/:crypto
+## Troubleshooting
 
-// Analysis data
-GET /api/analysis/:crypto
-```
+Auth loops / verification fails:
+- Ensure the Discord application Redirect URI matches your DISCORD_CALLBACK_URL exactly.
+- Confirm the bot is in the guild and has permissions; DISCORD_GUILD_ID and DISCORD_PREMIUM_ROLE_ID must be correct.
+- In production, cookies require https and sameSite=none; ensure you serve via TLS and set HOST properly.
+- Check Nginx forwarding headers (Host, X-Forwarded-Proto) and that your session secret is set.
 
-## Data Management
+WebSocket not connecting:
+- Confirm Nginx includes Upgrade/Connection headers.
+- Backend must use server.listen (already wired) so upgrade requests are handled.
+- In dev, client connects to /ws through Vite proxy; verify FRONTEND_PORT/BACKEND_PORT.
 
-### Caching Strategy
+Port conflicts:
+- Adjust BACKEND_PORT/FRONTEND_PORT or stop processes using the ports.
 
-- Price data: 1 minute
-- News data: 15 minutes
-- Historical data: 5 minutes
-- Analysis results: 3 minutes
+Rate limiting (429s):
+- CoinGecko/NewsData requests are rate‑limited; backend caches results and falls back to cache when available.
 
-### Rate Limiting
-
-```typescript
-const CACHE_DURATION = {
-  PRICE: 1 * 60 * 1000,
-  NEWS: 15 * 60 * 1000,
-  HISTORICAL: 5 * 60 * 1000,
-  SENTIMENT: 3 * 60 * 1000,
-};
-```
+TradingView/widget warnings:
+- Third‑party scripts may log benign warnings; ensure network access is allowed and CSP permits required domains.
 
 ## Contributing
 
-### Development Workflow
+We welcome improvements and bug fixes.
 
-1. Fork the repository
-2. Create a feature branch
-3. Implement changes
-4. Add tests
-5. Submit pull request
-
-### Code Style
-
-- Follow TypeScript best practices
-- Use ESLint configuration
-- Follow component structure guidelines
-- Include proper documentation
+- Create a feature branch from main
+- Keep changes focused and add tests where applicable
+- Follow TypeScript/ESLint rules; prefer small, composable components/services
+- For auth‑related changes, test the full Discord role verification flow
+- Open a PR with a clear description and reproduction steps
 
 ## License
 
-MIT License - see LICENSE.md for details
-
-## Support
-
-For support, email [sajan.writings@gmail.com].
-
----
+MIT — see LICENSE (or contact maintainers if absent).
 
 ## Acknowledgments
 
-- TensorFlow.js team
-- CoinGecko API
-- NewsData API
-- Open source contributors
+- Grid Zero community and contributors
+- TensorFlow.js, CoinGecko, NewsData.io, Groq
+- Radix UI, shadcn/ui, Vite, Express
