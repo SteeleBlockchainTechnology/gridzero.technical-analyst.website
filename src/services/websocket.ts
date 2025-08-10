@@ -28,9 +28,10 @@ class WebSocketService {
       }
 
       // Use environment-based WebSocket URL
+      // In dev, route through Vite proxy at /ws so it uses configured backend port
       const wsUrl = process.env.NODE_ENV === 'production'
         ? `wss://${window.location.host}`
-        : `ws://localhost:3001`;
+        : `${window.location.protocol.replace('http', 'ws')}//${window.location.host}/ws`;
       
       this.ws = new WebSocket(wsUrl);
 

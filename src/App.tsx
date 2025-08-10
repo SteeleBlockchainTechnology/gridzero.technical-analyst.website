@@ -16,7 +16,6 @@ import { Coins, Clock} from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
 import { CoinSearchSelect } from './components/ui/CoinSearchSelect';
-
 import { Button } from "./components/ui/button"
 
 

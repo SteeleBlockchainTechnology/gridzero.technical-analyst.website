@@ -82,7 +82,8 @@ try {
 
 const app = express();
 const server = http.createServer(app);
-const PORT = parseInt(process.env.VITE_PORT || '3001', 10);
+// Prefer BACKEND_PORT/PORT for dev; keep VITE_PORT fallback to preserve existing behavior
+const PORT = parseInt(process.env.BACKEND_PORT || process.env.PORT || process.env.VITE_PORT || '5000', 10);
 
 // Trust proxy for Nginx/reverse proxy setup
 app.set('trust proxy', 1);
@@ -91,7 +92,12 @@ app.set('trust proxy', 1);
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? [`https://${process.env.HOST}`, `https://www.${process.env.HOST}`]
-    : ['http://localhost:5173', 'http://localhost:3001'],
+    : [
+        'http://localhost:3000', // frontend dev default
+        'http://localhost:5173', // existing vite default
+        'http://localhost:5000', // backend dev default
+        'http://localhost:3001'  // existing backend default
+      ],
   methods: ['GET', 'POST', 'OPTIONS'],
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -108,7 +114,7 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production', // HTTPS required in production
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Use 'none' for cross-site HTTPS
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Use 'none' for cross-site HTTPS
     path: '/',
     domain: process.env.NODE_ENV === 'production' ? 'ta.gridzero.xyz' : undefined
   },
@@ -963,15 +969,16 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// Start server
-app.listen(PORT, '0.0.0.0', () => {
+// Start server using the HTTP server (enables WebSocket upgrade handling)
+server.listen(PORT, '0.0.0.0', () => {
   const environment = process.env.NODE_ENV || 'development';
   const host = process.env.HOST || 'localhost';
   const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
 
   if (environment === 'development') {
-    console.log(`🚀 Development Server running at http://localhost:${PORT}`);
-    console.log(`📊 Frontend running at http://localhost:5173`);
+  console.log(`🚀 Development Server running at http://localhost:${PORT}`);
+  const frontPort = process.env.FRONTEND_PORT || process.env.VITE_FRONTEND_PORT || '3000';
+  console.log(`📊 Frontend running at http://localhost:${frontPort}`);
   } else {
     console.log(`🚀 Production Server running at ${protocol}://${host}:${PORT}`);
     console.log(`📊 Frontend available at ${protocol}://${host}`);
