@@ -94,7 +94,6 @@ app.use(cors({
     ? [`https://${process.env.HOST}`, `https://www.${process.env.HOST}`]
     : [
         'http://localhost:3000', // frontend dev default
-        'http://localhost:5173', // existing vite default
         'http://localhost:5000', // backend dev default
         'http://localhost:3001'  // existing backend default
       ],
@@ -199,7 +198,7 @@ app.get('/api/auth/discord/callback', (req, res, next) => {
         console.log('Session saved successfully, redirecting...');
         const redirectUrl = process.env.NODE_ENV === 'production' 
           ? `https://${process.env.HOST}`
-          : 'http://localhost:5173';
+          : 'http://localhost:5000';
         
         res.redirect(redirectUrl);
       });
