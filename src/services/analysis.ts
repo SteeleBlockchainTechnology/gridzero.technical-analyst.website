@@ -87,7 +87,7 @@ class AnalysisService {
     return pd; // may be zero; callers handle fallback
   }
 
-  private async waitForHistoryReady(crypto: string, days: number = 200, maxWaitMs = 3000) {
+  private async waitForHistoryReady(crypto: string, days: number = 90, maxWaitMs = 3000) {
     const start = Date.now();
     let data = await this.getHistoricalData(crypto, days);
     if (Array.isArray(data?.prices) && data.prices.length >= this.MIN_HISTORY_POINTS) return data;
@@ -542,6 +542,7 @@ class AnalysisService {
 
   async getDetailedAnalysis(crypto: string): Promise<DetailedAnalysis> {
     try {
+  console.time(`[MA] total ${crypto}`);
       // Ensure price store is active for this crypto
       try { await priceStore.setActiveCrypto(crypto); } catch {}
 
@@ -550,7 +551,9 @@ class AnalysisService {
       const currentPrice = priceData.price;
 
       // Fetch historical data with readiness check
-      const historicalData = await this.waitForHistoryReady(crypto);
+  console.time(`[MA] history ${crypto}`);
+  const historicalData = await this.waitForHistoryReady(crypto, 90);
+  console.timeEnd(`[MA] history ${crypto}`);
       const prices = historicalData.prices;
       const volumes = historicalData.volumes;
       // Use currentPrice from price store instead of historicalData.current_price
@@ -606,10 +609,12 @@ class AnalysisService {
   const latestPrice = safePrices[latestDateIndex] || currentPrice || 0;
       const marketSummary = `${crypto.charAt(0).toUpperCase() + crypto.slice(1)} as of ${new Date().toLocaleDateString()} is in a ${marketPhase} phase, trading at $${latestPrice.toFixed(2)}. RSI is ${(rsi || 0).toFixed(2)} (${this.interpretRSI(rsi || 0)}), with MACD indicating ${macd.interpretation}. The volume trend is ${obvTrend} with a ${(volumeRatio || 0).toFixed(2)}x change compared to the average volume.`;
 
-      // Get market sentiment and news
-      const sentiment = await this.getMarketSentiment(crypto);
+  // Get market sentiment and news
+  console.time(`[MA] news/sentiment ${crypto}`);
+  const sentiment = await this.getMarketSentiment(crypto);
   const newsResponse = await api.getNews(crypto);
   const newsItems = newsResponse.news; // Extract the news array
+  console.timeEnd(`[MA] news/sentiment ${crypto}`);
 
       // Generate signals based on all indicators
       const signals = [
@@ -646,12 +651,14 @@ class AnalysisService {
       ];
 
       // Generate AI analysis
-      const aiAnalysis = await this.getAIAnalysis(
+  console.time(`[MA] groq ${crypto}`);
+  const aiAnalysis = await this.getAIAnalysis(
         crypto,
         technicalIndicators,
         newsItems, // Pass the news array
         sentiment
       );
+  console.timeEnd(`[MA] groq ${crypto}`);
 
       // Parse AI analysis
       const parsedAnalysis = this.parseAIAnalysis(aiAnalysis);
@@ -678,7 +685,7 @@ class AnalysisService {
         }
       };
 
-      return {
+      const result: DetailedAnalysis = {
         summary: parsedAnalysis.summary[0] || marketSummary,
         aiAnalysis,
         priceTargets: {
@@ -709,10 +716,103 @@ class AnalysisService {
           trend: marketPhase
         }
       };
+      console.timeEnd(`[MA] total ${crypto}`);
+      return result;
     } catch (error) {
       console.error('Error in analysis service:', error);
       throw error;
     }
+  }
+
+  // Fast path: return indicators and structure without waiting for Groq
+  async getDetailedAnalysisQuick(crypto: string): Promise<DetailedAnalysis> {
+    console.time(`[MA-quick] total ${crypto}`);
+    // Ensure price store is active for this crypto
+    try { await priceStore.setActiveCrypto(crypto); } catch {}
+
+    const priceData = await this.waitForPriceReady(crypto);
+    const currentPrice = priceData.price;
+
+    console.time(`[MA-quick] history ${crypto}`);
+    const historicalData = await this.waitForHistoryReady(crypto, 90);
+    console.timeEnd(`[MA-quick] history ${crypto}`);
+
+    const prices = historicalData.prices;
+    const volumes = historicalData.volumes;
+    if (!Array.isArray(prices) || prices.length < this.MIN_HISTORY_POINTS) {
+      throw new Error('Insufficient historical data');
+    }
+    const safePrices = prices.filter(p => Number.isFinite(p) && p > 0);
+    const safeVolumes = Array.isArray(volumes) ? volumes.filter(v => Number.isFinite(v) && v >= 0) : [];
+
+    const rsi = this.calculateRSI(safePrices);
+    const macd = this.calculateMACD(safePrices);
+    const movingAverages = {
+      ma20: this.calculateSMA(safePrices, 20),
+      ma50: this.calculateSMA(safePrices, 50),
+      ma200: this.calculateSMA(safePrices, 200)
+    };
+    const { support, resistance } = this.findSupportResistance(safePrices);
+    const volumeRatio = this.calculateVolumeRatio(safeVolumes.length ? safeVolumes : new Array(safePrices.length).fill(0));
+    const volatilityIndex = this.calculateVolatility(safePrices);
+  const marketPhase = this.determineMarketPhase(safePrices, movingAverages.ma50, movingAverages.ma200);
+
+  // keep only fields used in quick result; full indicators computed in main path
+
+    const latestPrice = safePrices[safePrices.length - 1] || currentPrice || 0;
+    const marketSummary = `${crypto.charAt(0).toUpperCase() + crypto.slice(1)} as of ${new Date().toLocaleDateString()} is in a ${marketPhase} phase, trading at $${latestPrice.toFixed(2)}.`;
+
+    const sentiment = await this.getMarketSentiment(crypto);
+    const priceTargets = {
+      shortTerm: {
+        low: currentPrice * (1 - volatilityIndex * 0.1),
+        high: currentPrice * (1 + volatilityIndex * 0.1)
+      },
+      midTerm: {
+        low: currentPrice * (1 - volatilityIndex * 0.2),
+        high: currentPrice * (1 + volatilityIndex * 0.2)
+      },
+      longTerm: {
+        low: currentPrice * (1 - volatilityIndex * 0.3),
+        high: currentPrice * (1 + volatilityIndex * 0.3)
+      }
+    };
+
+    const shortTermConfidence = this.calculateConfidence(rsi, macd, volumeRatio, sentiment, volatilityIndex);
+    const midTermConfidence = Math.max(30, shortTermConfidence * 0.9);
+    const longTermConfidence = Math.max(30, shortTermConfidence * 0.8);
+
+    const result: DetailedAnalysis = {
+      summary: marketSummary,
+      aiAnalysis: '', // staged later
+      priceTargets: {
+        '24H': { range: `$${priceTargets.shortTerm.low.toFixed(2)} - $${priceTargets.shortTerm.high.toFixed(2)}`, confidence: shortTermConfidence.toString() },
+        '7D': { range: `$${priceTargets.midTerm.low.toFixed(2)} - $${priceTargets.midTerm.high.toFixed(2)}`, confidence: midTermConfidence.toString() },
+        '30D': { range: `$${priceTargets.longTerm.low.toFixed(2)} - $${priceTargets.longTerm.high.toFixed(2)}`, confidence: longTermConfidence.toString() }
+      },
+      signals: [
+        { text: `RSI: ${this.interpretRSI(rsi)}`, importance: shortTermConfidence > 70 ? 'high' : 'medium' },
+      ],
+      strategy: {
+        position: marketPhase === 'Bull Market' ? 'Long' : 'Short',
+        entry: (support + (resistance - support) * 0.382).toString(),
+        stop: (support * 0.95).toString(),
+        target: resistance.toString()
+      },
+      marketStructure: { trend: marketPhase }
+    };
+    console.timeEnd(`[MA-quick] total ${crypto}`);
+    return result;
+  }
+
+  // Public wrapper to run Groq separately when staging UI
+  async getAIAnalysisPublic(
+    crypto: string,
+    technicalIndicators: TechnicalIndicators,
+    news: any[],
+    sentiment: any
+  ): Promise<string> {
+    return this.getAIAnalysis(crypto, technicalIndicators, news, sentiment);
   }
 
   private parseAIAnalysis(html: string): ParsedSections {

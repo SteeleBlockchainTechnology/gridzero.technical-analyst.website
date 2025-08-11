@@ -50,7 +50,7 @@ export function useAdvancedAnalysis(crypto: string) {
 
     // Small debounce to avoid racing the first WS tick after crypto changes
     if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-  timeoutRef.current = window.setTimeout(fetchAnalysis, 500) as unknown as number;
+  timeoutRef.current = window.setTimeout(fetchAnalysis, 300) as unknown as number;
     return () => {
       if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
     };

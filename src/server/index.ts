@@ -491,7 +491,7 @@ const wss = new WebSocketServer({ server });
 const COINGECKO_API = 'https://api.coingecko.com/api/v3';
 const CACHE_DURATION = {
   PRICE: 5 * 60 * 1000,      // 5 minutes - longer cache to reduce API calls
-  HISTORY: 30 * 60 * 1000,   // 30 minutes
+  HISTORY: 60 * 60 * 1000,   // 60 minutes (was 30) to reduce CoinGecko pressure
   MARKET: 10 * 60 * 1000     // 10 minutes
 };
 

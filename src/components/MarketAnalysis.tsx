@@ -206,24 +206,44 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto, predicti
       setError(null);
 
       await waitForReadiness();
-      
-      const result = await analysisService.getDetailedAnalysis(crypto);
-      if (!result) {
-        throw new Error('No analysis data available');
-      }
+      // 1) Quick path first for fast UI paint
+      const quick = await analysisService.getDetailedAnalysisQuick(crypto);
+      if (!quick) throw new Error('No analysis data available');
 
-      // Merge external predictions with analysis data
-      const mergedAnalysis = {
-        ...result,
+      const quickMerged = {
+        ...quick,
         priceTargets: {
-          ...result.priceTargets,
+          ...quick.priceTargets,
           externalPredictions: predictions
         }
       };
 
       if (thisReq === reqCounter.current) {
-        setAnalysis(mergedAnalysis);
+        setAnalysis(quickMerged);
+        setLoading(false); // Render TA now while AI hydrates
       }
+
+      // 2) In background, fetch full analysis to hydrate AI insights
+      analysisService.getDetailedAnalysis(crypto)
+        .then(full => {
+          if (!full) return;
+          if (thisReq === reqCounter.current) {
+            setAnalysis(prev => prev ? {
+              ...prev,
+              // only hydrate AI narrative to avoid flicker
+              aiAnalysis: full.aiAnalysis
+            } : {
+              ...full,
+              priceTargets: {
+                ...full.priceTargets,
+                externalPredictions: predictions
+              }
+            });
+          }
+        })
+        .catch(err => {
+          console.warn('Full analysis (AI) failed; keeping quick results:', err);
+        });
     } catch (err) {
       console.error('Error in MarketAnalysis:', err);
       if (thisReq === reqCounter.current) {
@@ -259,9 +279,9 @@ export const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ crypto, predicti
   useEffect(() => {
     // Debounce fetches to avoid racing with price/news/history on first load or crypto switch
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
-  debounceRef.current = window.setTimeout(() => {
+    debounceRef.current = window.setTimeout(() => {
       fetchAnalysis();
-  }, 500) as unknown as number;
+    }, 300) as unknown as number;
     return () => {
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
     };
